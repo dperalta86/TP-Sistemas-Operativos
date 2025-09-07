@@ -5,16 +5,44 @@ int conectar_servidor(char *ip, char *puerto)
     struct addrinfo hints, *server_info;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = AF_INET;       // IPv6
+    hints.ai_socktype = SOCK_STREAM; // TCP
 
-    getaddrinfo(ip, puerto, &hints, &server_info);
+    // Arma la información de la dirección del socket
+    int resultado_obtener_server_info = getaddrinfo(
+        ip,
+        puerto,
+        &hints,
+        &server_info);
 
-    int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);;
+    if (resultado_obtener_server_info == -1)
+    {
+        return -1;
+    }
 
-    connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen);
+    // Crea el socket del cliente
+    int socket_cliente = socket(
+        server_info->ai_family,
+        server_info->ai_socktype,
+        server_info->ai_protocol);
 
+    if (socket_cliente == -1)
+    {
+        return -1;
+    }
+
+    // Intenta conectarse al servidor
+    int resultado_conexion = connect(
+        socket_cliente,
+        server_info->ai_addr,
+        server_info->ai_addrlen);
+
+    if (resultado_conexion == -1)
+    {
+        return -1;
+    }
+
+    // Libera la memoria del puntero con la info. de dirección del servidor
     freeaddrinfo(server_info);
 
     return socket_cliente;

@@ -8,14 +8,13 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <commons/log.h>
 
 /**
  * Permite conectarse a un servidor mediante sockets
  * 
  * @param ip Dirección IP del servidor
  * @param puerto Puerto del servidor
- * @return El socket del cliente
+ * @return El descriptor del socket del cliente o un -1 si hubo un error.
  */
 int conectar_servidor(char *ip, char *puerto);
 
