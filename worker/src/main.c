@@ -1,63 +1,59 @@
 #include <stdio.h>
 #include <commons/log.h>
 #include <commons/config.h>
-#include <utils/cliente.h>
 #include <unistd.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-t_log* log_create_in_working_dir(char *process_name, bool is_active_console, char* s_level) {
-    char directorio_actual[PATH_MAX];
-    char ruta_log[PATH_MAX];
-
-    if (getcwd(directorio_actual, sizeof(directorio_actual)) == NULL) {
-        return NULL;
-    }
-
-    t_log_level level = log_level_from_string(s_level);
-
-    snprintf(ruta_log, sizeof(ruta_log), "%s/worker.log", directorio_actual);
-
-    t_log* logger = log_create(ruta_log, process_name, is_active_console, level);
-
-    return logger;
-}
+#include <utils/client_socket.h>
+#include <config/worker_config.h>
+#include <logger/logger.h>
 
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        perror("Se deben ingresar los parametros [archivo_config] y [ID Worker]");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Se deben ingresar los argumentos [archivo_config] y [ID Worker]");
+        goto error;
     }
     
     char* config_file_path = argv[1];
-
-    t_config* config = config_create(config_file_path);
-    if (!config) {
-        perror("No se pudo abrir el config");
-        exit(EXIT_FAILURE);
+    t_worker_config* worker_config = create_worker_config(config_file_path);
+    if (worker_config == NULL) {
+        fprintf(stderr, "No se pudo cargar la configuración\n");
+        goto error;
     }
 
-
-    char* master_ip = config_get_string_value(config, "IP_MASTER");
-    char* master_port = config_get_string_value(config, "PUERTO_MASTER");
-    char* log_level = config_get_string_value(config, "LOG_LEVEL");
-
-    t_log* logger = log_create_in_working_dir("worker", true, log_level);
-
-    int client_socket = conectar_servidor(master_ip, master_port);
-
-    if (client_socket < 0) {
-        config_destroy(config);
-        log_destroy(logger);
-        exit(EXIT_FAILURE);
+    if (logger_init("worker", worker_config->log_level, true) != 0) {
+        fprintf(stderr, "No se pudo inicializar el logger global\n");
+        goto clean;
     }
 
-    log_info(logger, "## Se establecio conexión con Master %s:%s", master_ip, master_port);
+    t_log* logger = logger_get();
 
-    config_destroy(config);
-    log_destroy(logger);
-    return 0;
+    int client_socket_master = client_connect(worker_config->master_ip, worker_config->master_port);
+    if (client_socket_master < 0) {
+        log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->master_ip, worker_config->master_port);
+        goto clean;
+    }
+    log_info(logger, "## Se establecio conexión con Master. IP=%s:%s", worker_config->master_ip, worker_config->master_port);
+
+    int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
+    if (client_socket_master < 0) {
+        log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
+        goto clean;
+    }
+
+    log_info(logger, "## Se establecio conexión con Storage. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
+
+    destroy_worker_config(worker_config);
+    logger_destroy();
+    close(client_socket_master);
+    close(client_socket_storage);
+    exit(EXIT_SUCCESS);
+
+clean:
+    destroy_worker_config(worker_config);
+    logger_destroy();
+error:
+    exit(EXIT_FAILURE);
 }
-
