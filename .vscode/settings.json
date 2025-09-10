@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.json": "json",
+        "client_socket.h": "c",
+        "config.h": "c",
+        "log.h": "c",
+        "unistd.h": "c",
+        "limits.h": "c",
+        "worker_config.h": "c"
+    }
+}
