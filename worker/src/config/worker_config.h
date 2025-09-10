@@ -27,6 +27,7 @@ typedef struct
  * Crea la configuración del Worker y la devuelve
  *
  * @param config_file_path Ruta absoluta del archivo de configuración
+ * @return Devuelve la configuración del worker o NULL si falla
  * @warning Cuando se deja de usar, debe ser destruido con destroy_worker_config
  */
 t_worker_config *create_worker_config(char *config_file_path);
