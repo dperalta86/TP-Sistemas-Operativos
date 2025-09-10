@@ -20,6 +20,6 @@ void buffer_destroy(t_buffer *buffer) {
 void buffer_write_uint8(t_buffer *buffer, uint8_t value) {
     if (buffer->size + value > buffer->capacity) return;
 
-    memcpy(buffer->stream + buffer->capacity, &value, sizeof(uint8_t));
-    buffer->capacity += sizeof(uint8_t);
+    memcpy(buffer->stream + buffer->size, &value, sizeof(uint8_t));
+    buffer->size += sizeof(uint8_t);
 }
