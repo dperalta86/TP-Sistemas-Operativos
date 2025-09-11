@@ -21,6 +21,13 @@ void buffer_destroy(t_buffer *buffer)
     free(buffer);
 }
 
+void buffer_reset_offset(t_buffer *buffer)
+{
+    if (!buffer)
+        return;
+    buffer->offset = 0;
+}
+
 void buffer_write_uint8(t_buffer *buffer, uint8_t value)
 {
     size_t remaining_capacity = buffer->size - buffer->offset;
@@ -36,7 +43,7 @@ void buffer_write_uint8(t_buffer *buffer, uint8_t value)
 void buffer_write_uint16(t_buffer *buffer, uint16_t value)
 {
     size_t remaining_capacity = buffer->size - buffer->offset;
-    uint16_t *next_position = (uint16_t *)buffer->stream + buffer->offset;
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
 
     if (remaining_capacity < sizeof(uint16_t))
         return;
@@ -48,7 +55,7 @@ void buffer_write_uint16(t_buffer *buffer, uint16_t value)
 void buffer_write_uint32(t_buffer *buffer, uint32_t value)
 {
     size_t remaining_capacity = buffer->size - buffer->offset;
-    uint32_t *next_position = (uint32_t *)buffer->stream + buffer->offset;
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
 
     if (remaining_capacity < sizeof(uint32_t))
         return;
@@ -59,17 +66,108 @@ void buffer_write_uint32(t_buffer *buffer, uint32_t value)
 
 void buffer_write_string(t_buffer *buffer, char *value)
 {
-    uint32_t str_length = string_length(value) + 1;
+    uint32_t str_length = string_length(value);
     size_t size_msg = sizeof(uint32_t) + str_length;
     size_t remaining_capacity = buffer->size - buffer->offset;
-    char *next_position = (char *)buffer->stream + buffer->offset;
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
 
     if (remaining_capacity < size_msg)
         return;
 
-    memcpy(next_position, &str_length, sizeof(uint32_t));
+    uint32_t net_len = htonl(str_length);
+
+    memcpy(next_position, &net_len, sizeof(uint32_t));
     buffer->offset += sizeof(uint32_t);
-    next_position = (char *)buffer->stream + buffer->offset;
+
+    next_position = (uint8_t *)buffer->stream + buffer->offset;
     memcpy(next_position, value, str_length);
     buffer->offset += str_length;
+}
+
+
+uint8_t buffer_read_uint8(t_buffer *buffer)
+{
+    uint8_t value = 0;
+    size_t remaining_stream_size = buffer->size - buffer->offset;
+    size_t value_size = sizeof(uint8_t);
+
+    if (remaining_stream_size < value_size)
+        return value;
+
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(&value, next_position, value_size);
+
+    buffer->offset += value_size;
+
+    return value;
+}
+
+uint16_t buffer_read_uint16(t_buffer *buffer)
+{
+    uint16_t value = 0;
+    size_t remaining_stream_size = buffer->size - buffer->offset;
+    size_t value_size = sizeof(uint16_t);
+
+    if (remaining_stream_size < value_size)
+        return value;
+
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(&value, next_position, value_size);
+
+    buffer->offset += value_size;
+
+    return value;
+}
+
+uint32_t buffer_read_uint32(t_buffer *buffer)
+{
+    uint32_t value = 0;
+    size_t remaining_stream_size = buffer->size - buffer->offset;
+    size_t value_size = sizeof(uint32_t);
+
+    if (remaining_stream_size < value_size)
+        return value;
+
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(&value, next_position, value_size);
+
+    buffer->offset += value_size;
+
+    return value;
+}
+
+char *buffer_read_string(t_buffer *buffer)
+{
+    size_t remaining_size = buffer->size - buffer->offset;
+    size_t size_length = sizeof(uint32_t);
+    uint32_t length = 0;
+    char *value = NULL;
+
+    if (buffer->size < buffer->offset)
+        return NULL;
+
+    if (remaining_size < size_length)
+        return NULL;
+
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(&length, next_position, size_length);
+    length = ntohl(length);
+
+    buffer->offset += size_length;
+    remaining_size = buffer->size - buffer->offset;
+
+    if (remaining_size < length)
+    {
+        buffer->offset -= size_length;
+        return NULL;
+    }
+
+    value = malloc(length + 1);
+
+    next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(value, next_position, length);
+    value[length] = '\0'; // Esto es para que le agregue el terminador del string
+    buffer->offset += length;
+
+    return value;
 }

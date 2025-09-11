@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <commons/string.h>
+#include <arpa/inet.h>
 
 typedef struct
 {
@@ -31,12 +32,16 @@ t_buffer *buffer_create(size_t capacity);
  * @param buffer El buffer que se quiere eliminar
  */
 void buffer_destroy(t_buffer *buffer);
+void buffer_reset_offset(t_buffer *buffer);
 
 void buffer_write_uint8(t_buffer *buffer, uint8_t value);
 void buffer_write_uint16(t_buffer *buffer, uint16_t value);
 void buffer_write_uint32(t_buffer *buffer, uint32_t value);
 void buffer_write_string(t_buffer *buffer, char *value);
 
-void buffer_read_uint8(t_buffer *buffer);
+uint8_t buffer_read_uint8(t_buffer *buffer);
+uint16_t buffer_read_uint16(t_buffer *buffer);
+uint32_t buffer_read_uint32(t_buffer *buffer);
+char *buffer_read_string(t_buffer *buffer);
 
 #endif
