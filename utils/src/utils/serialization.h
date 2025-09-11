@@ -37,4 +37,6 @@ void buffer_write_uint16(t_buffer *buffer, uint16_t value);
 void buffer_write_uint32(t_buffer *buffer, uint32_t value);
 void buffer_write_string(t_buffer *buffer, char *value);
 
+void buffer_read_uint8(t_buffer *buffer);
+
 #endif
