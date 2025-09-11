@@ -16,7 +16,7 @@ typedef struct
 
 typedef struct
 {
-    size_t operation_code; // Identificador de tipo de mensaje
+    uint8_t operation_code; // Identificador de tipo de mensaje
     t_buffer *buffer;      // Mensaje serializado
 } t_package;
 
@@ -43,5 +43,15 @@ uint8_t buffer_read_uint8(t_buffer *buffer);
 uint16_t buffer_read_uint16(t_buffer *buffer);
 uint32_t buffer_read_uint32(t_buffer *buffer);
 char *buffer_read_string(t_buffer *buffer);
+
+/**
+ * Crea un paquete
+ * @param operation_code Número que identifica al paquete
+ * @return Paquete creado o NULL si hubo algun error
+ */
+t_package *package_create(size_t operation_code); // TODO: Cuando sepamos los mensajes usar otra estructura para operation_code
+void package_destroy(t_package *package);
+void package_send(t_package *package, int socket);
+void package_receive(t_package *package int socket);
 
 #endif
