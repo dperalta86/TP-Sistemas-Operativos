@@ -50,8 +50,25 @@ char *buffer_read_string(t_buffer *buffer);
  * @return Paquete creado o NULL si hubo algun error
  */
 t_package *package_create(size_t operation_code); // TODO: Cuando sepamos los mensajes usar otra estructura para operation_code
+
+/**
+ * Libera la memoria asociada a un paquete
+ * @param package Puntero al paquete a destruir
+ */
 void package_destroy(t_package *package);
+
+/**
+ * Envía un paquete a través de un socket
+ * @param package Paquete a enviar (ya creado y cargado con datos)
+ * @param socket Descriptor del socket por donde se enviará el paquete
+ */
 void package_send(t_package *package, int socket);
+
+/**
+ * Recibe un paquete desde un socket
+ * @param package Puntero al paquete donde se almacenarán los datos recibidos
+ * @param socket Descriptor del socket desde el cual se recibirá el paquete
+ */
 void package_receive(t_package *package, int socket);
 
 #endif
