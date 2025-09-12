@@ -52,6 +52,6 @@ char *buffer_read_string(t_buffer *buffer);
 t_package *package_create(size_t operation_code); // TODO: Cuando sepamos los mensajes usar otra estructura para operation_code
 void package_destroy(t_package *package);
 void package_send(t_package *package, int socket);
-void package_receive(t_package *package int socket);
+void package_receive(t_package *package, int socket);
 
 #endif

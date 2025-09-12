@@ -206,7 +206,7 @@ void package_send(t_package *package, int socket) {
     package_destroy(package);    
 }
 
-void package_receive(t_package *package, socket) {
+void package_receive(t_package *package, int socket) {
     if (package == NULL) package = malloc(sizeof(t_package));
     if (package->buffer == NULL) package->buffer = malloc(sizeof(t_buffer));
 
