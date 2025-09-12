@@ -8,6 +8,11 @@ t_buffer *buffer_create(size_t size)
 
     new_buffer->size = size;
     new_buffer->stream = malloc(size);
+    if (!new_buffer->stream)
+    {
+        free(new_buffer);
+        return NULL;
+    }
     new_buffer->offset = 0;
 
     return new_buffer;
@@ -83,7 +88,6 @@ void buffer_write_string(t_buffer *buffer, char *value)
     memcpy(next_position, value, str_length);
     buffer->offset += str_length;
 }
-
 
 uint8_t buffer_read_uint8(t_buffer *buffer)
 {
@@ -164,6 +168,12 @@ char *buffer_read_string(t_buffer *buffer)
 
     value = malloc(length + 1);
 
+    if (!value)
+    {
+        buffer->offset -= size_length;
+        return NULL;
+    }
+
     next_position = (uint8_t *)buffer->stream + buffer->offset;
     memcpy(value, next_position, length);
     value[length] = '\0'; // Esto es para que le agregue el terminador del string
@@ -172,10 +182,11 @@ char *buffer_read_string(t_buffer *buffer)
     return value;
 }
 
-
 t_package *package_create(size_t operation_code)
 {
     t_package *package = malloc(sizeof(t_package));
+    if (!package)
+        return NULL;
     package->operation_code = operation_code;
     return package;
 }
@@ -184,14 +195,17 @@ void package_destroy(t_package *package)
 {
     if (!package)
         return;
-    if (package->buffer != NULL) 
+    if (package->buffer != NULL)
         buffer_destroy(package->buffer);
     free(package);
 }
 
-void package_send(t_package *package, int socket) {
+void package_send(t_package *package, int socket)
+{
     uint32_t serialized_package_size = sizeof(package->operation_code) + sizeof(size_t) + package->buffer->size;
     void *serialized_package = malloc(serialized_package_size);
+    if (!serialized_package)
+        return NULL;
     int offset = 0;
 
     memcpy(serialized_package + offset, &(package->operation_code), sizeof(uint8_t));
@@ -201,17 +215,48 @@ void package_send(t_package *package, int socket) {
     memcpy(serialized_package + offset, package->buffer->stream, package->buffer->size);
 
     send(socket, serialized_package, serialized_package_size, 0);
-    
+
     free(serialized_package);
-    package_destroy(package);    
+    package_destroy(package);
 }
 
-void package_receive(t_package *package, int socket) {
-    if (package == NULL) package = malloc(sizeof(t_package));
-    if (package->buffer == NULL) package->buffer = malloc(sizeof(t_buffer));
+t_package *package_receive(int socket)
+{
+    t_package *package = malloc(sizeof(t_package));
+    if (!package)
+        return NULL;
 
-    recv(socket, &(package->operation_code), sizeof(uint8_t), 0);
-    recv(socket, &(package->buffer->size), sizeof(size_t), 0);
-    recv(socket, package->buffer->stream, package->buffer->size, 0);
-    package->buffer->offset = 0;
+    package->buffer = malloc(sizeof(t_buffer));
+    if (!package->buffer)
+    {
+        free(package);
+        return NULL;
+    }
+
+    if (recv(socket, &package->operation_code, sizeof package->operation_code, 0) <= 0) {
+        free(package->buffer);
+        free(package);
+        return NULL;
+    }
+    if (recv(socket, &package->buffer->size, sizeof package->buffer->size, 0) <= 0) {
+        free(package->buffer);
+        free(package);
+        return NULL;
+    }
+
+    package->buffer->stream = malloc(package->buffer->size);
+    if (!package->buffer->stream) {
+        free(package->buffer);
+        free(package);
+        return NULL;
+    }
+
+    if (recv(socket, package->buffer->stream, package->buffer->size, 0) <= 0) {
+        free(package->buffer->stream);
+        free(package->buffer);
+        free(package);
+        return NULL;
+    }
+
+    return package;
 }

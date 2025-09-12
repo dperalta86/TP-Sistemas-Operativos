@@ -66,9 +66,9 @@ void package_send(t_package *package, int socket);
 
 /**
  * Recibe un paquete desde un socket
- * @param package Puntero al paquete donde se almacenarán los datos recibidos
  * @param socket Descriptor del socket desde el cual se recibirá el paquete
+ * @return package Puntero al paquete donde se almacenarán los datos recibidos
  */
-void package_receive(t_package *package, int socket);
+t_package *package_receive(int socket);
 
 #endif
