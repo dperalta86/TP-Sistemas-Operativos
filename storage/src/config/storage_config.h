@@ -11,7 +11,7 @@
 typedef struct {
     char* storage_ip;
     char* storage_port;
-    char* freash_start;
+    char* fresh_start;
     char* module_path;
     char* operation_delay;
     char* block_access_delay;

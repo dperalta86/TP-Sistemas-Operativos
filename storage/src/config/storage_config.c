@@ -1,4 +1,4 @@
-#include <storage_config.h>
+#include "storage_config.h"
 #include <errno.h>
 
 static bool has_required_properties(t_config *config);
@@ -30,12 +30,12 @@ t_storage_config *create_storage_config(const char *config_file_path)
         return NULL;
     }
 
-    storage_config->master_ip = duplicate_config_value(config_get_string_value(config, "STORAGE_IP"), config, storage_config);
-    storage_config->master_port = duplicate_config_value(config_get_string_value(config, "STORAGE_PORT"), config, storage_config);
-    storage_config->replacement_algorithm = duplicate_config_value(config_get_string_value(config, "FRESH_START"), config, storage_config);
-    storage_config->path_scripts = duplicate_config_value(config_get_string_value(config, "MODULE_PATH"), config, storage_config);
-    storage_config->path_scripts = duplicate_config_value(config_get_string_value(config, "OPERATION_DELAY"), config, storage_config);
-    storage_config->path_scripts = duplicate_config_value(config_get_string_value(config, "BLOCK_ACCESS_DELAY"), config, storage_config);
+    storage_config->storage_ip = duplicate_config_value(config_get_string_value(config, "STORAGE_IP"), config, storage_config);
+    storage_config->storage_port = duplicate_config_value(config_get_string_value(config, "STORAGE_PORT"), config, storage_config);
+    storage_config->fresh_start = duplicate_config_value(config_get_string_value(config, "FRESH_START"), config, storage_config);
+    storage_config->module_path = duplicate_config_value(config_get_string_value(config, "MODULE_PATH"), config, storage_config);
+    storage_config->operation_delay = duplicate_config_value(config_get_string_value(config, "OPERATION_DELAY"), config, storage_config);
+    storage_config->block_access_delay = duplicate_config_value(config_get_string_value(config, "BLOCK_ACCESS_DELAY"), config, storage_config);
     storage_config->log_level = duplicate_config_value(config_get_string_value(config, "LOG_LEVEL"), config, storage_config);
 
     config_destroy(config);
@@ -82,6 +82,13 @@ static bool has_required_properties(t_config *config)
     return true;
 }
 
+static void handle_fatal_error(t_config *config, t_storage_config *storage_config) {
+    fprintf(stderr, "Error fatal, cerrando el programa.\n");
+    config_destroy(config);
+    destroy_storage_config(storage_config);
+    exit(EXIT_FAILURE);
+}
+
 static char *duplicate_config_value(char *value, t_config *config, t_storage_config *storage_config)
 {
     if (!value)
@@ -96,11 +103,4 @@ static char *duplicate_config_value(char *value, t_config *config, t_storage_con
         handle_fatal_error(config, storage_config);
     }
     return duplicate;
-}
-
-static void handle_fatal_error(t_config *config, t_storage_config *storage_config) {
-    fprintf(stderr, "Error fatal, cerrando el programa.\n");
-    config_destroy(config);
-    destroy_storage_config(storage_config);
-    exit(EXIT_FAILURE);
 }
