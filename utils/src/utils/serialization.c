@@ -205,3 +205,13 @@ void package_send(t_package *package, int socket) {
     free(serialized_package);
     package_destroy(package);    
 }
+
+void package_receive(t_package *package, socket) {
+    if (package == NULL) package = malloc(sizeof(t_package));
+    if (package->buffer == NULL) package->buffer = malloc(sizeof(t_buffer));
+
+    recv(socket, &(package->operation_code), sizeof(uint8_t), 0);
+    recv(socket, &(package->buffer->size), sizeof(size_t), 0);
+    recv(socket, package->buffer->stream, package->buffer->size, 0);
+    package->buffer->offset = 0;
+}
