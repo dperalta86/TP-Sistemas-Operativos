@@ -1,7 +1,10 @@
 #ifndef QUERY_CONTROL_CONFIG_H
 #define QUERY_CONTROL_CONFIG_H
 
+#include <commons/config.h>
 #include <commons/log.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     char *ip;
