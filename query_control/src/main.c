@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
               log_level_as_string(query_control_config->log_level));
 
     int master_socket = connect_to_server(query_control_config->ip, query_control_config->port);
-    if (master_socket == -1) {
+    if (master_socket < 0) {
         log_error(logger, "Error al conectar con el master en %s:%s", query_control_config->ip, query_control_config->port);
         retval = -5;
         goto clean_logger;
