@@ -15,12 +15,14 @@ t_storage_config* g_storage_config;
 t_log* g_storage_logger;
 
 int main(int argc, char* argv[]) {
-    char config_file_path[50];
+    char config_file_path[PATH_MAX];
 
     if (argc == 1) {
-        strcpy(config_file_path, "./src/storage.config");
+        strncpy(config_file_path, "./src/storage.config", PATH_MAX - 1);
+        config_file_path[PATH_MAX - 1] = '\0';
     } else if (argc == 2) {
-        strcpy(config_file_path, argv[1]);
+        strncpy(config_file_path, argv[1], PATH_MAX - 1);
+        config_file_path[PATH_MAX - 1] = '\0';
     } else {
         fprintf(stderr, "Solo se puede ingresar el argumento [archivo_config]");
         goto error;
