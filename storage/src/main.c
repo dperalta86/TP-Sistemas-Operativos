@@ -37,6 +37,10 @@ int main(int argc, char* argv[]) {
     g_storage_logger = create_logger("./", "storage", false, g_storage_config->log_level);
 
     int socket = start_server(g_storage_config->storage_ip, g_storage_config->storage_port);
+    if (socket == -1) {
+        fprintf(stderr, "No se pudo iniciar el servidor en %s:%s\n", g_storage_config->storage_ip, g_storage_config->storage_port);
+        goto error;
+    }
     log_info(g_storage_logger, "Servidor iniciado en %s:%s", g_storage_config->storage_ip, g_storage_config->storage_port);
 
     destroy_storage_config(g_storage_config);
