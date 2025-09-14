@@ -1,0 +1,15 @@
+#ifndef UTILS_H
+#define UTILS_H
+
+#include <limits.h>
+#include <unistd.h>
+#include <commons/log.h>
+#include <stdbool.h>
+#include <string.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+t_log* create_logger(char *directory, char *process_name, bool is_active_console, char* s_level);
+
+#endif // UTILS_H
