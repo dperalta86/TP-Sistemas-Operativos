@@ -3,6 +3,7 @@
 #include <query_control_manager.h>
 #include <config/master_config.h>
 #include <utils/protocol.h>
+#include <utils/serialization.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <linux/limits.h>
@@ -129,36 +130,59 @@ void* handle_client(void* arg) {
     int client_socket = client_data->client_socket;
     t_log* logger = client_data->logger;    
 
-    char buffer[256];
-    int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+    t_package *required_package = package_receive(client_socket);
 
-    if (bytes_received <= 0) {
-        log_error(logger, "Error al recibir mensaje del cliente %d", client_socket);
+    if (required_package == NULL) {
+        log_error(logger, "Error al recibir el paquete del cliente %d", client_socket);
         goto cleanup;
     }
 
-    buffer[bytes_received] = '\0';
-
-    // Verificar op code recibido
-    t_message_op_code op_code= check_message_op_code(buffer);
-    
-    // Verificar si es un handshake de Query Control
-    if (strcmp(buffer, "QUERY_CONTROL_HANDSHAKE") == 0) {
-        log_info(logger, "Se conecto un Query Control - Socket: %d", client_socket);
-
-        // Enviar respuesta de handshake
-        char* response = "HANDSHAKE_OK";
-        if (send(client_socket, response, strlen(response), 0) == -1) {
-            log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
-        } else {
-            log_info(logger, "Handshake completado con Query Control en socket %d", client_socket);
+    switch (required_package->operation_code)
+    {
+    case OP_QUERY_FILE_PATH:
+        log_debug(logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
+        if (manage_query_file_path(required_package->buffer, client_socket, logger) != 0) {
+            log_error(logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
         }
-    } else {
-        log_warning(logger, "Mensaje desconocido del cliente %d: %s", client_socket, buffer);
+        
+        break;
+    
+    default:
+        log_warning(logger, "Operacion desconocida recibida del cliente %d", client_socket);
+        break;
     }
 
+package_destroy(required_package);
 cleanup:
-    close(client_socket);
-    free(client_data);
-    return NULL;
+close(client_socket);
+free(client_data);
+return NULL;
 }
+    //int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+
+   // if (bytes_received <= 0) {
+   //   log_error(logger, "Error al recibir mensaje del cliente %d", client_socket);
+     //   goto cleanup;
+    //}
+
+    //buffer[bytes_received] = '\0';
+
+    // Verificar op code recibido
+  //  t_message_op_code op_code= check_message_op_code(buffer);
+    
+    // Verificar si es un handshake de Query Control
+    //if (strcmp(buffer, "QUERY_CONTROL_HANDSHAKE") == 0) {
+      //  log_info(logger, "Se conecto un Query Control - Socket: %d", client_socket);
+
+        // Enviar respuesta de handshake
+       // char* response = "HANDSHAKE_OK";
+        //if (send(client_socket, response, strlen(response), 0) == -1) {
+         //   log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
+        //} else {
+         //   log_info(logger, "Handshake completado con Query Control en socket %d", client_socket);
+       // }
+    //} else {
+      //  log_warning(logger, "Mensaje desconocido del cliente %d: %s", client_socket, buffer);
+   // }
+
+

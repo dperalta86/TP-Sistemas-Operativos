@@ -2,6 +2,8 @@
 #define QUERY_CONTROL_MANAGER_H
 
 #include <commons/log.h>
+#include <utils/serialization.h>
+#include <utils/protocol.h>
 
 typedef enum {
     QUERY_STATE_NEW,
@@ -20,5 +22,7 @@ typedef struct {
     t_query_state state;
     t_log *logger;
 } t_query_control_block;
+
+int manage_query_file_path(t_buffer *required_package,int client_socket, t_log *logger);
 
 #endif
