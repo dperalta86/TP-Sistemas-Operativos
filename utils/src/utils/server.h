@@ -30,8 +30,8 @@ int start_server(char *ip, char *puerto);
  * @param puerto: puerto del servidor al cual nos conectamos
  * @return int: ID del file descriptor del socket creado con el servidor
  * 
- * @example int socket = conectar_a_servidor("192.168.0.1", "2340");
+ * @example int socket = connect_to_server("192.168.0.1", "2340");
  */
-int conectar_a_servidor(char *ip, char *puerto);
+int connect_to_server(char *ip, char *puerto);
 
 #endif
