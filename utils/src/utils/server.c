@@ -54,3 +54,44 @@ bind_error:
 error:
     return -1;
 }
+
+int connect_to_server(char *ip, char *port) {
+    struct addrinfo hints, *server_info;
+    int retval;
+
+    if (ip == NULL || port == NULL) {
+        retval = -1;
+        goto error;
+    }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int result = getaddrinfo(ip, port, &hints, &server_info);
+    if (result != 0) {
+        retval = -2;
+        goto error;
+    }
+
+    int client_socket = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+    if (client_socket == -1) {
+        retval = -3;
+        goto clean;
+    }
+
+    if (connect(client_socket, server_info->ai_addr, server_info->ai_addrlen) == -1) {
+        retval = -4;
+        goto connect_error;
+    }
+
+    freeaddrinfo(server_info);
+    return client_socket;
+
+connect_error:
+    close(client_socket);
+clean:
+    freeaddrinfo(server_info);
+error:
+    return retval;
+}

@@ -10,6 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-t_log* create_logger(char *directory, char *process_name, bool is_active_console, char* s_level);
+t_log* create_logger(char *directory, char *process_name, bool is_active_console, t_log_level log_level);
 
 #endif // UTILS_H
