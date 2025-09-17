@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
     // Armo el string a enviar: [path_query]\x1F[prioridad]
     snprintf(send_buffer, sizeof(send_buffer), "%s\x1F%d", query_filepath, priority);
     buffer_write_string(package_to_send->buffer, send_buffer);
-    printf("Enviando al master: %s\n", send_buffer);
+    log_debug(logger, "Buffer serializado para enviar al master: %s", send_buffer);
 
     if (package_send(package_to_send, master_socket) != 0)
     {

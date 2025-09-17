@@ -29,8 +29,9 @@ int manage_query_file_path(t_buffer *buffer, int client_socket, t_log *logger) {
     }
 
     // Loggear la información recibida
-    log_info(logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d",query_file_path, priority, 0, 0);
-
+    int assigned_id = 2; // TODO: Asignar el ID real cuando esté implementado
+    int multiprocessing_level = 1; // TODO: Asignar el nivel real cuando esté implementado
+    log_info(logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_file_path, priority, assigned_id, multiprocessing_level);
     // TODO: agregar la lógica para manejar la ejecución del query
 
     free(data);

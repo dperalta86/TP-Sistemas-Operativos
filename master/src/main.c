@@ -59,12 +59,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Seteo el nivel de logeo desde el config
-    if(log_set_level(logger, master_config->log_level) != 0) 
-    {
-        logger->detail = LOG_LEVEL_DEBUG; // Por defecto DEBUG si hay un error
-        log_warning(logger, "Nivel de logeo invalido en el archivo de configuracion: %s. Usando DEBUG por defecto.", log_level_as_string(master_config->log_level));
-
-    }
+    logger->detail = master_config->log_level;
 
     log_debug(logger, "Configuracion leida: \n\tIP_ESCUCHA=%s\n\tPUERTO_ESCUCHA=%s\n\tALGORITMO_PLANIFICACION=%s\n\tTIEMPO_AGING=%d\n\tLOG_LEVEL=%s",
              master_config->ip, master_config->port, master_config->scheduler_algorithm, master_config->aging_time, log_level_as_string(master_config->log_level));
