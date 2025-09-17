@@ -1,5 +1,5 @@
-#ifndef WORKER_LOGGER_H
-#define WORKER_LOGGER_H
+#ifndef LOGGER_H
+#define LOGGER_H
 
 #include <commons/log.h>
 #include <stdbool.h>
