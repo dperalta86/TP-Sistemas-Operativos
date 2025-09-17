@@ -16,7 +16,7 @@ int logger_init(const char *process_name, t_log_level log_level, bool to_console
     }
 
     char *log_path = NULL;
-    if (asprintf(&log_path, "%s/worker.log", cwd) == -1) {
+    if (asprintf(&log_path, "%s/%s.log", cwd, process_name) == -1) {
         free(cwd);
         return -1;
     }
