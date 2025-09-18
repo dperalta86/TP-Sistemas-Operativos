@@ -182,7 +182,7 @@ char *buffer_read_string(t_buffer *buffer)
     return value;
 }
 
-t_package *package_create(size_t operation_code, t_buffer *buffer)
+t_package *package_create(uint8_t operation_code, t_buffer *buffer)
 {
     t_package *package = malloc(sizeof(t_package));
     if (!package)
@@ -222,7 +222,6 @@ int package_send(t_package *package, int socket)
     send(socket, serialized_package, serialized_package_size, 0);
 
     free(serialized_package);
-    package_destroy(package);
   
     return 0;
 }

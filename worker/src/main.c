@@ -5,9 +5,9 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <utils/client_socket.h>
 #include <config/worker_config.h>
-#include <logger/logger.h>
+#include <utils/logger.h>
+#include <connections/master.h>
 
 int main(int argc, char *argv[])
 {
@@ -25,21 +25,17 @@ int main(int argc, char *argv[])
         goto error;
     }
 
-    if (logger_init("worker", worker_config->log_level, true) != 0)
+    t_log_level log_level = log_level_from_string(worker_config->log_level);
+
+    if (logger_init("worker", log_level, true) < 0)
     {
         fprintf(stderr, "No se pudo inicializar el logger global\n");
         goto clean;
     }
-
     t_log *logger = logger_get();
+    log_info(logger, "## Logger inicializado");
 
-    int client_socket_master = client_connect(worker_config->master_ip, worker_config->master_port);
-    if (client_socket_master < 0)
-    {
-        log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->master_ip, worker_config->master_port);
-        goto clean;
-    }
-    log_info(logger, "## Se establecio conexión con Master. IP=%s:%s", worker_config->master_ip, worker_config->master_port);
+    int client_socket_master = handshake_with_master(worker_config->master_ip, worker_config->master_port);
 
     // int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
     // if (client_socket_storage < 0)

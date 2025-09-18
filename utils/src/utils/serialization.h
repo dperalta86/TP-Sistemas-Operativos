@@ -50,7 +50,7 @@ char *buffer_read_string(t_buffer *buffer);
  * @param buffer Buffer que contiene los datos del paquete
  * @return Paquete creado o NULL si hubo algun error
  */
-t_package *package_create(size_t operation_code, t_buffer *buffer); // TODO: Cuando sepamos los mensajes usar otra estructura para operation_code
+t_package *package_create(uint8_t operation_code, t_buffer *buffer); // TODO: Cuando sepamos los mensajes usar otra estructura para operation_code
 
 /**
  * Libera la memoria asociada a un paquete

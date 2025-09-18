@@ -6,7 +6,10 @@
 typedef enum {
     OP_QUERY_HANDSHAKE,
     OP_QUERY_FILE_PATH,
-// Agregar codigos para workers y otros modulos
-} t_message_op_code;
+    OP_WORKER_HANDSHAKE_REQ,
+    OP_WORKER_HANDSHAKE_RES,
+} t_master_op_code;
+
+// TODO: Crear t_storage_op_code
 
 #endif
