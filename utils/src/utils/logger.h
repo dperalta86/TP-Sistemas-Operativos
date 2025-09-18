@@ -3,6 +3,10 @@
 
 #include <commons/log.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /**
  * Inicializa un logger global en "<cwd>/process_name.log"
@@ -13,7 +17,7 @@
  *
  * @return retorna 0 si es exitoso y -1 si hay un error.
  */
-int logger_init(const char *process_name, t_log_level log_level, bool to_console);
+int logger_init(char *process_name, t_log_level log_level, bool to_console);
 
 /**
  * Devuelve el logger global
