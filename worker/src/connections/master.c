@@ -3,7 +3,12 @@
 int handshake_with_master(const char *master_ip, const char *master_port)
 {
     t_log *logger = logger_get();
-    int client_socket_master = client_connect(master_ip, master_port);
+    t_package *request = NULL;
+    t_package *response = NULL;
+    t_buffer *buffer = NULL;
+    int client_socket_master = -1;
+
+    client_socket_master = client_connect(master_ip, master_port);
     if (client_socket_master < 0)
     {
         log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", master_ip, master_port);
@@ -12,16 +17,16 @@ int handshake_with_master(const char *master_ip, const char *master_port)
 
     log_info(logger, "## Se establecio conexión con Master. IP=%s:%s", master_ip, master_port);
 
-    t_buffer *buffer = buffer_create(sizeof(uint8_t));
+    buffer = buffer_create(sizeof(uint8_t));
     buffer_write_uint8(buffer, OP_WORKER_HANDSHAKE_REQ);
-    t_package *request = package_create(OP_WORKER_HANDSHAKE_REQ, buffer);
+    request = package_create(OP_WORKER_HANDSHAKE_REQ, buffer);
     if (package_send(request, client_socket_master) < 0) {
         log_error(logger, "## No se pudo enviar el handshake al Master");
         goto clean;
     }
     package_destroy(request);
 
-    t_package *response = package_receive(client_socket_master);
+    response = package_receive(client_socket_master);
     if (response == NULL) {
         log_error(logger, "## No se pudo recibir el handshake del Master");
         goto clean;
@@ -40,5 +45,6 @@ int handshake_with_master(const char *master_ip, const char *master_port)
 clean:
     if (request) package_destroy(request);
     if (response) package_destroy(response);
+    if (client_socket_master >= 0) close(client_socket_master);
     return -1;
 }
