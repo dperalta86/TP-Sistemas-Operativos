@@ -2,6 +2,7 @@
 #define MASTER_CONFIG_H
 
 #include <commons/config.h>
+#include <commons/log.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,6 +15,7 @@ typedef struct
     char *port;
     char *scheduler_algorithm;
     int aging_time;
+    t_log_level log_level;
 } t_master_config;
 
 
@@ -32,6 +34,6 @@ t_master_config *create_master_config(char *config_file_path);
  *
  * @param masterer_config La struct de configuracion del Worker
  */
-void destroy_config(t_master_config *master_config);
+void destroy_master_config_instance(t_master_config *master_config);
 
 #endif

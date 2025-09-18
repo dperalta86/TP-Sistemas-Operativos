@@ -12,4 +12,6 @@
 
 t_log* create_logger(char *directory, char *process_name, bool is_active_console, t_log_level log_level);
 
-#endif // UTILS_H
+int log_set_level(t_log* logger, t_log_level new_log_level);
+
+#endif

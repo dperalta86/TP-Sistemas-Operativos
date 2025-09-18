@@ -21,6 +21,7 @@ t_master_config *create_master_config(char *config_file_path)
     master_config->port = strdup(config_get_string_value(config, "PUERTO_ESCUCHA"));
     master_config->scheduler_algorithm = strdup(config_get_string_value(config, "ALGORITMO_PLANIFICACION"));
     master_config->aging_time = config_get_int_value(config, "TIEMPO_AGING");
+    master_config->log_level = log_level_from_string(config_get_string_value(config, "LOG_LEVEL"));
 
     config_destroy(config);
     
@@ -28,11 +29,11 @@ t_master_config *create_master_config(char *config_file_path)
 
 error:
     config_destroy(config);
-    destroy_config(master_config);
+    destroy_master_config_instance(master_config);
     return NULL;
 }
 
-void destroy_config(t_master_config *master_config)
+void destroy_master_config_instance(t_master_config *master_config)
 {
     if (!master_config)
         return;

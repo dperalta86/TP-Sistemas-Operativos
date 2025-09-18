@@ -182,12 +182,17 @@ char *buffer_read_string(t_buffer *buffer)
     return value;
 }
 
-t_package *package_create(size_t operation_code)
+t_package *package_create(uint8_t operation_code, t_buffer *buffer)
 {
     t_package *package = malloc(sizeof(t_package));
     if (!package)
         return NULL;
     package->operation_code = operation_code;
+    if (!buffer) {
+        free(package);
+        return NULL;
+    }
+    package->buffer = buffer;
     return package;
 }
 
@@ -200,12 +205,12 @@ void package_destroy(t_package *package)
     free(package);
 }
 
-void package_send(t_package *package, int socket)
+int package_send(t_package *package, int socket)
 {
     uint32_t serialized_package_size = sizeof(package->operation_code) + sizeof(size_t) + package->buffer->size;
     void *serialized_package = malloc(serialized_package_size);
     if (!serialized_package)
-        return NULL;
+        return -1;
     int offset = 0;
 
     memcpy(serialized_package + offset, &(package->operation_code), sizeof(uint8_t));
@@ -217,7 +222,8 @@ void package_send(t_package *package, int socket)
     send(socket, serialized_package, serialized_package_size, 0);
 
     free(serialized_package);
-    package_destroy(package);
+  
+    return 0;
 }
 
 t_package *package_receive(int socket)

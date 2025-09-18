@@ -8,6 +8,8 @@
 #include <utils/hello.h>
 #include <utils/server.h>
 #include <utils/utils.h>
+#include <utils/protocol.h>
+#include <utils/serialization.h>
 
 #define MODULO "QUERY_CONTROL"
 
@@ -71,18 +73,73 @@ int main(int argc, char* argv[])
         goto clean_logger;
     }
 
-    log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s", query_control_config->ip, query_control_config->port);
-    log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %d", query_filepath, priority);
-
-    snprintf(send_buffer, sizeof(send_buffer), "%s\x1F%d", query_filepath, priority);
-    if (send(master_socket, send_buffer, strlen(send_buffer) + 1, 0) == -1)
+    // Enviar handshake al master
+    t_package* package_handshake = package_create(OP_QUERY_HANDSHAKE);
+    if (package_handshake == NULL) 
     {
-        log_error(logger, "Error al enviar el path de query y prioridad al master");
+        log_error(logger, "Error al crear el paquete para el handshake al master");
+        goto clean_socket;
+    }
+
+    char handshake_message[] = "QUERY_CONTROL_HANDSHAKE";
+    package_handshake->buffer = buffer_create(strlen(handshake_message) + 1);
+    if (package_handshake->buffer == NULL) 
+    {
+        log_error(logger, "Error al crear el buffer para el handshake al master");
         retval = -6;
+        goto clean_socket;
+    }
+    buffer_write_string(package_handshake->buffer, handshake_message);
+
+    if (package_send(package_handshake, master_socket) != 0)
+    {
+        log_error(logger, "Error al enviar el paquete para handshake al master");
         goto clean_socket;
     }
 
     int response_bytes = recv(master_socket, response_buffer, sizeof(response_buffer) - 1, 0);
+    if (response_bytes <= 0) {
+        log_error(logger, "Error al recibir respuesta del query del master");
+        goto clean_socket;
+    }
+
+    response_buffer[response_bytes] = '\0';
+    
+    int assigned_id = (int)strtol(response_buffer, NULL, 10);
+    log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s. ID asignado: %d", query_control_config->ip, query_control_config->port, assigned_id);
+
+    // Comienza petición de ejecución de query
+    log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %d", query_filepath, priority);
+
+    // Serializar y enviar el operation code, el path del query y la prioridad al master
+    t_package* package_to_send = package_create(OP_QUERY_FILE_PATH);
+    if (package_to_send == NULL) {
+        log_error(logger, "Error al crear el paquete para enviar el path del query y prioridad al master");
+        retval = -6;
+        goto clean_socket;
+    }
+    package_to_send->buffer = buffer_create(PATH_MAX + 1 + 11); // PATH_MAX para la ruta del query + 1 para el delimiter 0x1F + 11 para la prioridad (max int)
+    if (package_to_send->buffer == NULL) 
+    {
+        log_error(logger, "Error al crear el buffer para enviar el path del query y prioridad al master");
+        retval = -6;
+        goto clean_socket;
+    }
+
+    // Armo el string a enviar: [path_query]\x1F[prioridad]
+    snprintf(send_buffer, sizeof(send_buffer), "%s\x1F%d", query_filepath, priority);
+    buffer_write_string(package_to_send->buffer, send_buffer);
+    log_debug(logger, "Buffer serializado para enviar al master: %s", send_buffer);
+
+    if (package_send(package_to_send, master_socket) != 0)
+    {
+        log_error(logger, "Error al enviar el paquete con el path de query y prioridad al master");
+        retval = -6;
+        goto clean_socket;
+    }
+    log_info(logger, "Paquete con path de query: %s y prioridad: %d enviado al master correctamente", query_filepath, priority);
+
+    response_bytes = recv(master_socket, response_buffer, sizeof(response_buffer) - 1, 0);
     if (response_bytes <= 0) {
         log_error(logger, "Error al recibir respuesta del query del master");
         retval = -7;
