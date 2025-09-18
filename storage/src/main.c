@@ -13,7 +13,6 @@
 #include <pthread.h>
 #include "globals/globals.h"
 #include "server/server.h"
-#include "helper/helper.h"
 
 #define MODULE "STORAGE"
 #define DEFAULT_CONFIG_PATH "./src/config/storage.config"
