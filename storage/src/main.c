@@ -25,6 +25,7 @@ int g_worker_counter = 0;
 int main(int argc, char* argv[]) {
     // Obtiene posibles parametros de entrada
     char config_file_path[PATH_MAX];
+    int retval = 0;
 
     if (argc == 1) {
         strlcpy(config_file_path, DEFAULT_CONFIG_PATH, PATH_MAX);
@@ -32,6 +33,7 @@ int main(int argc, char* argv[]) {
         strlcpy(config_file_path, argv[1], PATH_MAX);
     } else {
         fprintf(stderr, "Solo se puede ingresar el argumento [archivo_config]\n");
+        retval = -1;
         goto error;
     }
 
@@ -39,6 +41,7 @@ int main(int argc, char* argv[]) {
     g_storage_config = create_storage_config(config_file_path);
     if (g_storage_config == NULL) {
         fprintf(stderr, "No se pudo cargar la configuración\n");
+        retval = -2;
         goto error;
     }
 
@@ -46,12 +49,14 @@ int main(int argc, char* argv[]) {
     char current_directory[PATH_MAX];
     if (getcwd(current_directory, sizeof(current_directory)) == NULL) {
         fprintf(stderr, "Error al obtener el directorio actual\n");
+        retval = -3;
         goto clean_config;
     }
 
     g_storage_logger = create_logger(current_directory, MODULE, false, g_storage_config->log_level);
     if (g_storage_logger == NULL) {
         fprintf(stderr, "No se pudo crear el logger\n");
+        retval = -4;
         goto clean_config;
     }
 
@@ -69,6 +74,7 @@ int main(int argc, char* argv[]) {
     int socket = start_server(g_storage_config->storage_ip, g_storage_config->storage_port);
     if (socket < 0) {
         log_error(g_storage_logger, "No se pudo iniciar el servidor en %s:%s\n", g_storage_config->storage_ip, g_storage_config->storage_port);
+        retval = -5;
         goto clean_logger;
     }
 
@@ -107,5 +113,5 @@ clean_config:
         destroy_storage_config(g_storage_config);
 
 error:
-    exit(EXIT_FAILURE);
+    return retval;
 }
