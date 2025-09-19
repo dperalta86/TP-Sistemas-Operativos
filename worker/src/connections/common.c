@@ -32,6 +32,7 @@ int handshake_with_server(const char *server_name,
     if (!request)
     {
         log_error(logger, "## No se pudo crear package para %s", server_name);
+        buffer_destroy(buffer);
         goto clean;
     }
 
