@@ -1,9 +1,9 @@
 #ifndef QUERY_CONTROL_MANAGER_H
 #define QUERY_CONTROL_MANAGER_H
 
-#include <commons/log.h>
 #include <utils/serialization.h>
 #include <utils/protocol.h>
+#include <pthread.h>
 
 typedef enum {
     QUERY_STATE_NEW,
@@ -15,13 +15,29 @@ typedef enum {
 
 typedef struct {
     int query_id;
-    int client_socket;
     char *query_file_path;
     int priority;
-    int asigned_worker_id;
+    int initial_priority;
+    int assigned_worker_id;
+    int program_counter;
     t_query_state state;
-    t_log *logger;
 } t_query_control_block;
+
+typedef struct {
+    t_query_control_block *query_list; // Lista de t_query_control_block
+
+    // Manejo de estados
+    t_query_control_block *ready_queue;   // Cola de queries listas para ejecutar
+    t_query_control_block *running_list; // Lista de queries en ejecución
+    t_query_control_block *completed_list; // Lista de queries completadas
+    t_query_control_block *canceled_list; // Lista de queries canceladas
+
+    int total_queries;
+    int next_query_id; // ID para la próxima query que se agregue
+
+    // Mutex para sincronización en cambio de estados
+    pthread_mutex_t query_table_mutex;
+} t_query_table;
 
 /**
  * @brief Maneja la recepción y el procesamiento de la ruta de archivo de consulta y su prioridad desde un cliente.
