@@ -53,4 +53,17 @@ typedef struct {
  */
 int manage_query_file_path(t_buffer *required_package,int client_socket, t_log *logger);
 
+/**
+ * @brief Maneja el proceso de handshake inicial con un cliente de control de consultas.
+ *
+ * Esta función envía un ID asignado (actualmente hardcodeado) al cliente para completar el proceso de handshake.
+ * Registra cualquier error que ocurra durante el envío del ID.
+ *
+ * @param buffer Puntero al bufer que contiene los datos entrantes.
+ * @param client_socket Descriptor de socket para el cliente conectado.
+ * @param logger Pointer al logger para registrar eventos y errores.
+ * @return 0 en caso de éxito, negativo en caso de error.
+ */
+int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger);
+
 #endif

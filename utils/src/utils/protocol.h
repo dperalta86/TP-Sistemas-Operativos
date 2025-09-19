@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+// Operation codes para Master
 typedef enum {
     OP_QUERY_HANDSHAKE,
     OP_QUERY_FILE_PATH,
