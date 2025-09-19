@@ -53,6 +53,8 @@ t_storage_config *create_storage_config(const char *config_file_path)
         goto cleanup;
     storage_config->fresh_start = strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0 ? true : false;
 
+    free(fresh_start_str);
+    free(log_level_str);
     config_destroy(config);
     return storage_config;
 
