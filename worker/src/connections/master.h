@@ -5,6 +5,7 @@
 #include <utils/logger.h>
 #include <utils/client_socket.h>
 #include <utils/protocol.h>
+#include "common.h"
 
 /**
  * Establece una conexión y realiza el handshake con el Master.
