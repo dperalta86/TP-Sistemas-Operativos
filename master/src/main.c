@@ -148,20 +148,23 @@ void* handle_client(void* arg) {
         {
             case OP_QUERY_HANDSHAKE:
                 log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
-                {
-                    char* response = "1"; // TODO: Generar ID único y secuencial
-                    if (send(client_socket, response, strlen(response), 0) == -1) {
-                        log_error(master->logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
-                        break;
-                    }
+                if (manage_query_handshake(required_package->buffer, client_socket, master->logger) == 0) {
                     log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
-                }
+                }              
                 break;
             case OP_QUERY_FILE_PATH:
                 log_debug(master->logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
                 if (manage_query_file_path(required_package->buffer, client_socket, master) != 0) {
                     log_error(master->logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
                 }
+                break;
+            
+            // Worker
+                case OP_WORKER_HANDSHAKE_REQ:
+                log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
+                if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
+                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
+                }              
                 break;
             default:
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);

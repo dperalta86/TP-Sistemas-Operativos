@@ -8,6 +8,8 @@
 
 #include <pthread.h>
 #include <commons/log.h>
+#include <utils/serialization.h>
+#include <utils/protocol.h>
 
 typedef struct master t_master;
 
@@ -37,4 +39,5 @@ typedef struct worker_table {
     pthread_mutex_t worker_table_mutex;
 } t_worker_table;
 
+int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master);
 #endif
