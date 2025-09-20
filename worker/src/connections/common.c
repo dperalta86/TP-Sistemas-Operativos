@@ -21,7 +21,7 @@ int handshake_with_server(const char *server_name,
     }
     log_info(logger, "## Se estableció conexión con %s. IP=%s:%s", server_name, ip, port);
 
-    buffer = buffer_create(sizeof(uint8_t));
+    buffer = buffer_create(string_length(worker_id));
     if (!buffer)
     {
         log_error(logger, "## No se pudo crear buffer para %s", server_name);
