@@ -1,6 +1,7 @@
 #include "query_control_manager.h"
-#include "utils/protocol.h"
-#include "utils/serialization.h"
+#include "utils/connection/protocol.h"
+#include "utils/connection/serialization.h"
+#include "commons/log.h"
 
 int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger) {
     // Enviar ID asignado al Query Control (hardcodeado por ahora)

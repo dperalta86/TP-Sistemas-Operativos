@@ -1,8 +1,9 @@
 #ifndef QUERY_CONTROL_MANAGER_H
 #define QUERY_CONTROL_MANAGER_H
 
-#include <utils/serialization.h>
-#include <utils/protocol.h>
+#include <utils/connection/protocol.h>
+#include <utils/connection/serialization.h>
+#include <commons/log.h>
 #include <pthread.h>
 
 typedef enum {
