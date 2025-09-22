@@ -137,14 +137,9 @@ void* handle_client(void* arg) {
         {
             case OP_QUERY_HANDSHAKE:
                 log_debug(logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
-                {
-                    char* response = "1"; // TODO: Generar ID único y secuencial
-                    if (send(client_socket, response, strlen(response), 0) == -1) {
-                        log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
-                        break;
-                    }
+                if (manage_query_handshake(required_package->buffer, client_socket, logger) == 0) {
                     log_info(logger, "Handshake completado con Query Control en socket %d", client_socket);
-                }
+                }              
                 break;
             case OP_QUERY_FILE_PATH:
                 log_debug(logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
