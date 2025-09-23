@@ -11,6 +11,9 @@ typedef enum {
     OP_WORKER_HANDSHAKE_RES,
 } t_master_op_code;
 
-// TODO: Crear t_storage_op_code
+typedef enum {
+    STORAGE_OP_WORKER_SEND_ID_REQ,
+    STORAGE_OP_WORKER_SEND_ID_RES,
+} t_storage_op_code;
 
 #endif

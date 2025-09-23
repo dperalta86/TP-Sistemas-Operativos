@@ -1,12 +1,9 @@
 #include "logger.h"
 
-#include <unistd.h>
-#include <limits.h>
-#include <stdio.h>
 
 static t_log *global_logger = NULL;
 
-int logger_init(const char *process_name, t_log_level log_level, bool to_console)
+int logger_init(char *process_name, t_log_level log_level, bool to_console)
 {
     if (global_logger) return 0;
 

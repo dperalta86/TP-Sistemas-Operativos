@@ -8,6 +8,7 @@
 #include <config/worker_config.h>
 #include <utils/logger.h>
 #include <connections/master.h>
+#include <connections/storage.h>
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +19,8 @@ int main(int argc, char *argv[])
     }
 
     char *config_file_path = argv[1];
+    char *worker_id = argv[2];
+
     t_worker_config *worker_config = create_worker_config(config_file_path);
     if (worker_config == NULL)
     {
@@ -35,21 +38,30 @@ int main(int argc, char *argv[])
     t_log *logger = logger_get();
     log_info(logger, "## Logger inicializado");
 
-    int client_socket_master = handshake_with_master(worker_config->master_ip, worker_config->master_port);
+    int client_socket_master =
+        handshake_with_master(worker_config->master_ip,
+                              worker_config->master_port,
+                              worker_id);
+    if (client_socket_master < 0)
+    {
+        goto clean;
+    }
 
-    // int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
-    // if (client_socket_storage < 0)
-    // {
-    //     log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
-    //     goto clean;
-    // }
-
-    // log_info(logger, "## Se establecio conexión con Storage. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
+    int client_socket_storage =
+        handshake_with_storage(worker_config->storage_ip,
+                               worker_config->storage_port,
+                               worker_id);
+    if (client_socket_storage < 0)
+    {
+        goto clean;
+    }
 
     destroy_worker_config(worker_config);
     logger_destroy();
-    close(client_socket_master);
-    // close(client_socket_storage);
+    if (client_socket_master >= 0)
+        close(client_socket_master);
+    if (client_socket_storage >= 0)
+        close(client_socket_storage);
     exit(EXIT_SUCCESS);
 
 clean:
