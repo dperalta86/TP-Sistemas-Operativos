@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
               "Configuracion leida: \\n\\tPUERTO_ESCUCHA=%s\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
               g_storage_config->storage_port,
               g_storage_config->fresh_start ? "TRUE" : "FALSE",
-              g_storage_config->module_path,
+              g_storage_config->mount_point,
               g_storage_config->operation_delay,
               g_storage_config->block_access_delay,
               log_level_as_string(g_storage_config->log_level));
@@ -76,16 +76,16 @@ int main(int argc, char* argv[]) {
     // Verifica si se realiza fresh start
     if (g_storage_config->fresh_start) {
         log_info(g_storage_logger, "Iniciando en modo FRESH_START, se eliminará el contenido previo en %s",
-                g_storage_config->module_path);
+                g_storage_config->mount_point);
 
-        int init_result = init_storage(g_storage_config->module_path);
+        int init_result = init_storage(g_storage_config->mount_point);
         if (init_result != 0) {
             log_error(g_storage_logger, "Error al inicializar el filesystem: %d", init_result);
             retval = -6;
             goto clean_logger;
         }
 
-        log_info(g_storage_logger, "Filesystem inicializado exitosamente en %s", g_storage_config->module_path);
+        log_info(g_storage_logger, "Filesystem inicializado exitosamente en %s", g_storage_config->mount_point);
     }
 
     // Inicia servidor

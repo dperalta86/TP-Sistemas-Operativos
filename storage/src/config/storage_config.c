@@ -38,10 +38,10 @@ t_storage_config *create_storage_config(const char *config_file_path)
         goto cleanup;
     storage_config->storage_port = storage_port_str;
 
-    char *module_path_str = strdup(config_get_string_value(config, "MODULE_PATH"));
-    if (!module_path_str)
+    char *mount_point_str = strdup(config_get_string_value(config, "MOUNT_POINT"));
+    if (!mount_point_str)
         goto cleanup;
-    storage_config->module_path = module_path_str;
+    storage_config->mount_point = mount_point_str;
 
     char *log_level_str = strdup(config_get_string_value(config, "LOG_LEVEL"));
     if (!log_level_str)
@@ -74,7 +74,7 @@ void destroy_storage_config(t_storage_config *storage_config)
 
     free(storage_config->storage_ip);
     free(storage_config->storage_port);
-    free(storage_config->module_path);
+    free(storage_config->mount_point);
 
     free(storage_config);
 }
@@ -85,7 +85,7 @@ static bool has_required_properties(t_config *config)
         "STORAGE_IP",
         "STORAGE_PORT",
         "FRESH_START",
-        "MODULE_PATH",
+        "MOUNT_POINT",
         "OPERATION_DELAY",
         "BLOCK_ACCESS_DELAY",
         "LOG_LEVEL"

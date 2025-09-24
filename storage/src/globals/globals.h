@@ -8,7 +8,7 @@ typedef struct {
     char* storage_ip;
     char* storage_port;
     bool fresh_start;
-    char* module_path;
+    char* mount_point;
     int operation_delay;
     int block_access_delay;
     t_log_level log_level;
