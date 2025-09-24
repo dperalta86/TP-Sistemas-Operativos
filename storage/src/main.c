@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include "globals/globals.h"
 #include "server/server.h"
+#include "fresh_start/fresh_start.h"
 
 #define MODULE "STORAGE"
 #define DEFAULT_CONFIG_PATH "./src/config/storage.config"
@@ -71,6 +72,21 @@ int main(int argc, char* argv[]) {
               g_storage_config->operation_delay,
               g_storage_config->block_access_delay,
               log_level_as_string(g_storage_config->log_level));
+
+    // Verifica si se realiza fresh start
+    if (g_storage_config->fresh_start) {
+        log_info(g_storage_logger, "Iniciando en modo FRESH_START, se eliminará el contenido previo en %s",
+                g_storage_config->module_path);
+
+        int init_result = init_storage(g_storage_config->module_path);
+        if (init_result != 0) {
+            log_error(g_storage_logger, "Error al inicializar el filesystem: %d", init_result);
+            retval = -6;
+            goto clean_logger;
+        }
+
+        log_info(g_storage_logger, "Filesystem inicializado exitosamente en %s", g_storage_config->module_path);
+    }
 
     // Inicia servidor
     int socket = start_server(g_storage_config->storage_ip, g_storage_config->storage_port);
