@@ -10,9 +10,9 @@
 #include<commons/collections/list.h>
 #include<string.h>
 #include<assert.h>
-#include "utils/protocol.h"
+#include "connection/protocol.h"
 #include "globals/globals.h"
-#include "utils/serialization.h"
+#include "connection/serialization.h"
 #include "operations/handshake.h"
 
 int wait_for_client(int server_socket);

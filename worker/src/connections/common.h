@@ -1,10 +1,10 @@
 #ifndef CONNECTION_COMMON_H
 #define CONNECTION_COMMON_H
 
-#include <utils/serialization.h>
+#include <connection/serialization.h>
 #include <utils/logger.h>
 #include <utils/client_socket.h>
-#include <utils/protocol.h>
+#include <connection/protocol.h>
 #include <commons/string.h>
 
 /**

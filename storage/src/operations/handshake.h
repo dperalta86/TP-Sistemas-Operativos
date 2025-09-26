@@ -1,8 +1,8 @@
 #ifndef STORAGE_OPERATIONS_HANDSHAKE_H_
 #define STORAGE_OPERATIONS_HANDSHAKE_H_
 
-#include "utils/serialization.h"
-#include "utils/protocol.h"
+#include "connection/serialization.h"
+#include "connection/protocol.h"
 #include "globals/globals.h"
 #include "server/server.h"
 

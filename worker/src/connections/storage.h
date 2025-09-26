@@ -1,10 +1,10 @@
 #ifndef CONNECTION_STORAGE_H
 #define CONNECTION_STORAGE_H
 
-#include <utils/serialization.h>
+#include <connection/serialization.h>
 #include <utils/logger.h>
 #include <utils/client_socket.h>
-#include <utils/protocol.h>
+#include <connection/protocol.h>
 #include "common.h"
 
 /**
