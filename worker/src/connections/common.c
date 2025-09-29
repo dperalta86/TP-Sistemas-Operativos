@@ -10,7 +10,6 @@ int handshake_with_server(const char *server_name,
     t_log *logger = logger_get();
     t_package *request = NULL;
     t_package *response = NULL;
-    t_buffer *buffer = NULL;
     int socket = -1;
 
     socket = client_connect(ip, port);
@@ -21,22 +20,19 @@ int handshake_with_server(const char *server_name,
     }
     log_info(logger, "## Se estableció conexión con %s. IP=%s:%s", server_name, ip, port);
 
-    buffer = buffer_create(string_length(worker_id));
-    if (!buffer)
-    {
-        log_error(logger, "## No se pudo crear buffer para %s", server_name);
-        goto clean;
-    }
-    buffer_write_string(buffer, worker_id);
-
-    request = package_create(request_op, buffer);
+    request = package_create_empty(request_op);
     if (!request)
     {
         log_error(logger, "## No se pudo crear package para %s", server_name);
-        buffer_destroy(buffer);
         goto clean;
     }
 
+    if(!package_add_string(request, worker_id))
+    {
+        log_error(logger, "## No se pudo agregar worker_id al package para %s", server_name);
+        goto clean;
+    }
+    
     if (package_send(request, socket) < 0)
     {
         log_error(logger, "## No se pudo enviar el handshake a %s", server_name);
