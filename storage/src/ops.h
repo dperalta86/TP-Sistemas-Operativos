@@ -14,4 +14,17 @@
  */
 int create_file(const char* name, const char* tag, const char* mount_point, t_log* logger);
 
+/**
+ * Modifica el tamaño del File:Tag especificado
+ * 
+ * @param name Nombre del File a truncar
+ * @param tag Tag del File a truncar
+ * @param new_size_bytes Nuevo tamaño en bytes del File
+ * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param logger Logger para registrar errores y operaciones
+ * @return 0 en caso de éxito, -1 si falla abrir superblock config, -2 si falla abrir metadata config, 
+ *         -3 si falla eliminar bloque lógico, -4 si falla crear hard link, -5 si falla asignación de memoria
+ */
+int truncate_file(const char* name, const char* tag, const int new_size_bytes, const char* mount_point, t_log* logger);
+
 #endif
