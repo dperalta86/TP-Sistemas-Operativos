@@ -14,6 +14,8 @@ typedef enum {
 typedef enum {
     STORAGE_OP_WORKER_SEND_ID_REQ,
     STORAGE_OP_WORKER_SEND_ID_RES,
+    STORAGE_OP_WORKER_GET_BLOCK_SIZE_REQ,
+    STORAGE_OP_WORKER_GET_BLOCK_SIZE_RES,
 } t_storage_op_code;
 
 #endif

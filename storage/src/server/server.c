@@ -33,6 +33,10 @@ void* handle_client(void* arg) {
                 response = handle_handshake(request, client_data);
     
                 break;
+            case STORAGE_OP_WORKER_GET_BLOCK_SIZE_REQ:
+                response = send_block_size(client_data);
+    
+                break;
             default:
                 log_error(g_storage_logger, "Código de operación desconocido recibido del Worker: %u", request->operation_code);
                 package_destroy(request);
