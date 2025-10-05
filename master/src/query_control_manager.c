@@ -47,6 +47,10 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     
     // TODO: agregar la lógica para manejar la ejecución del query
 
+    //Una vez que se añade la logica para la ejecucion de query, armar el package de QC_OP_READ_FILE
+    //t_package *query_path_package = package_create_empty(QC_OP_READ_FILE));
+
+
     package_destroy(query_path_package);
     free(query_path);
     return 0;

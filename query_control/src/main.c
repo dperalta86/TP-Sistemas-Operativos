@@ -121,14 +121,103 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     response_package = package_receive(master_socket); // --> Reutilzó response package
 
-    if (response_package->operation_code != OP_QUERY_FILE_PATH)
+    //Porque OP_QUERY_FILE_PATH es quien deberia manejar la respuesta? No deberia ser una op distinta?
+    /*if (response_package->operation_code != OP_QUERY_FILE_PATH)
     {
         log_error(logger, "Error al recibir respuesta..."); 
-    }
+    }*/
     log_info(logger, "Paquete con path de query: %s y prioridad: %d enviado al master correctamente", query_filepath, priority);
 
 
-    // TODO: Manejar la respuesta
+    // === Loop de recepción: READ / FIN ===
+    for (;;) {
+    t_package *resp = package_receive(master_socket);
+
+    if (!resp) {
+        log_error(logger, "Conexión con Master cerrada inesperadamente");
+        retval = -7;
+        break;
+    }
+
+    switch (resp->operation_code) {
+
+        case QC_OP_READ_DATA: {
+
+            char* file_tag = package_read_string(resp);  
+            size_t size = 0; 
+            void* file_data = package_read_data(resp, &size);
+
+            if(file_tag == NULL){
+                log_error(logger, "El fileTag recivido es nulo");
+                //TODO, encapsular manejo de error en una funcion auxiliar
+                package_destroy(resp);
+                retval=-7; 
+                goto clean_socket;
+
+            }
+            else if(file_data == NULL){
+                 log_error(logger, "No se leyo ningun dato del archivo %s", file_tag);  
+                 free(file_tag); 
+                 package_destroy(resp); 
+                 retval=-7; 
+                 goto clean_socket;             
+            } 
+
+
+            char* contenido = malloc(size + 1);
+
+            if (!contenido) {
+                log_error(logger, "Memoria insuficiente al procesar READ_DATA");
+                free(file_tag); free(file_data);
+                package_destroy(resp);
+                retval = -7;
+                //Ok el goto?
+                goto clean_socket;
+            }
+            memcpy(contenido, file_data, size);
+            contenido[size] = '\0';
+
+            log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
+
+            free(file_tag);
+            free(file_data);
+            free(contenido);
+        } break;
+
+        case QC_OP_MASTER_FIN: {
+            // Motivo int8 -> Porque finalizo la ejecucion de query
+            //Motivos :
+            /*
+            0 -> Prioridad
+            1 -> Error
+            */
+            uint8_t motivo = 1;
+            if (!package_read_uint8(resp, &motivo)) {
+                log_error(logger, "Paquete FIN inválido");
+                package_destroy(resp);
+                retval = -7;
+                goto clean_socket;
+            }
+            const char* motivoString = (motivo==1) ? "ERROR" : "DESCONEXION";
+            log_info(logger, "## Query Finalizada - %s", motivoString);
+
+            package_destroy(resp);
+            retval = 0;               
+            goto clean_socket;        
+        } break;
+
+        /*case OP_QUERY_FILE_PATH:
+            // Mensaje?
+            break;
+         */
+        default:
+            log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);
+            break;
+    }
+
+    package_destroy(resp);
+}
+
 
     package_destroy(package_to_send);
     package_destroy(response_package);
