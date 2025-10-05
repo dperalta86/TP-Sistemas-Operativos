@@ -188,7 +188,6 @@ int main(int argc, char* argv[])
             // Motivo int8 -> Porque finalizo la ejecucion de query
             //Motivos :
             /*
-            0 -> Prioridad
             1 -> Error
             */
             uint8_t motivo = 1;
