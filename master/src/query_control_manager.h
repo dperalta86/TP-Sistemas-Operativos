@@ -9,6 +9,7 @@
 #include <connection/protocol.h>
 #include <connection/serialization.h>
 #include <commons/log.h>
+#include <commons/collections/list.h>
 #include <pthread.h>
 #include <commons/log.h>
 
@@ -35,13 +36,13 @@ typedef struct {
 } t_query_control_block;
 
 typedef struct query_table {
-    t_query_control_block *query_list; // Lista de t_query_control_block
+    t_list *query_list; // Lista de t_query_control_block
 
     // Manejo de estados
-    t_query_control_block *ready_queue;   // Cola de queries listas para ejecutar
-    t_query_control_block *running_list; // Lista de queries en ejecución
-    t_query_control_block *completed_list; // Lista de queries completadas
-    t_query_control_block *canceled_list; // Lista de queries canceladas
+    t_list *ready_queue;   // Cola de queries listas para ejecutar
+    t_list *running_list; // Lista de queries en ejecución
+    t_list *completed_list; // Lista de queries completadas
+    t_list *canceled_list; // Lista de queries canceladas
 
     int total_queries;
     int next_query_id; // ID para la próxima query que se agregue

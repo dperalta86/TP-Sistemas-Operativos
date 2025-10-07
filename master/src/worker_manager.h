@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 #include <commons/log.h>
+#include <commons/collections/list.h>
 #include <connection/serialization.h>
 #include <connection/protocol.h>
 
@@ -28,12 +29,12 @@ typedef struct {
 } t_worker_control_block;
 
 typedef struct worker_table {
-    t_worker_control_block *worker_list; // Lista de t_worker_control_block
+    t_list *worker_list; // Lista de t_worker_control_block
     int total_workers_connected; // Define el nivel de multiprocesamiento
 
-    t_worker_control_block *idle_list; // Lista de workers en estado IDLE
-    t_worker_control_block *busy_list; // Lista de workers en estado BUSY
-    t_worker_control_block *disconnected_list; // Lista de workers en estado DISCONNECTED
+    t_list *idle_list; // Lista de workers en estado IDLE
+    t_list *busy_list; // Lista de workers en estado BUSY
+    t_list *disconnected_list; // Lista de workers en estado DISCONNECTED
 
     // Mutex para sincronización en asignación de workers
     pthread_mutex_t worker_table_mutex;
