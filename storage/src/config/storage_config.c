@@ -5,6 +5,7 @@ static bool has_required_properties(t_config *config);
 
 t_storage_config *create_storage_config(const char *config_file_path)
 {
+    // LECTURA DE ARCHIVO CONFIG
     t_config *config = config_create((char *)config_file_path);
     if (!config)
     {
@@ -53,6 +54,26 @@ t_storage_config *create_storage_config(const char *config_file_path)
         goto cleanup;
     storage_config->fresh_start = strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0 ? true : false;
 
+    // LECTURA DE ARCHIVO SUPERBLOCK CONFIG
+    char superblock_path[PATH_MAX];
+    snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", storage_config->mount_point);
+
+    t_config *superblock_config = config_create(superblock_path);
+    if (!superblock_config) {
+        fprintf(stderr, "No se pudo abrir el archivo: %s\n", superblock_path);
+        return NULL;
+    }
+
+    if (!config_has_property(superblock_config, "FS_SIZE") || !config_has_property(superblock_config, "BLOCK_SIZE")) {
+        fprintf(stderr, "El superblock.config no tiene las propiedades requeridas (FS_SIZE, BLOCK_SIZE)");
+        config_destroy(superblock_config);
+        return NULL;
+    }
+
+    storage_config->fs_size = config_get_int_value(superblock_config, "FS_SIZE");
+    storage_config->block_size = config_get_int_value(superblock_config, "BLOCK_SIZE");
+
+    config_destroy(superblock_config);
     free(fresh_start_str);
     free(log_level_str);
     config_destroy(config);
