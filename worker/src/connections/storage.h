@@ -22,6 +22,6 @@ int handshake_with_storage(const char *storage_ip, const char *storage_port, cha
  * @param block_size Puntero donde se almacenará el tamaño del block.
  * @return 0 si la operación fue exitosa, -1 en caso de error.
  */
-int get_block_size(int storage_socket, int *block_size);
+int get_block_size(int storage_socket, uint16_t *block_size);
 
 #endif

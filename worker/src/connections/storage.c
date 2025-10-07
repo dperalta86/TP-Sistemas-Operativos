@@ -11,9 +11,9 @@ int handshake_with_storage(const char *storage_ip,
                                  worker_id);
 }
 
-int get_block_size(int storage_socket, int *block_size) {
-    t_log *logger = get_logger();
-    t_package *request = package_create(STORAGE_OP_WORKER_GET_BLOCK_SIZE_REQ, NULL);
+int get_block_size(int storage_socket, uint16_t *block_size) {
+    t_log *logger = logger_get();
+    t_package *request = package_create_empty(STORAGE_OP_WORKER_GET_BLOCK_SIZE_REQ);
     if (!request) {
         log_error(logger, "Error al crear el paquete para solicitar el tamaño del bloque");
         return -1;
@@ -35,7 +35,7 @@ int get_block_size(int storage_socket, int *block_size) {
         return -1;
     }
     
-    memcpy(block_size, response->buffer, sizeof(int));
+    package_read_uint16(response, block_size);
     package_destroy(response);
     return 0;
 }

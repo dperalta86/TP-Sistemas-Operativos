@@ -18,6 +18,7 @@ typedef struct
     int memory_retardation;
     char *replacement_algorithm;
     char *path_scripts;
+    int block_size;
     char *log_level;
 } t_worker_config;
 
