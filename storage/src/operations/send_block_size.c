@@ -7,7 +7,7 @@ t_package* send_block_size(t_client_data *client_data) {
         return NULL;
     }
 
-    if(!package_add_uint8(response, g_storage_config->block_size)) {
+    if(!package_add_uint16(response, g_storage_config->block_size)) {
         log_error(g_storage_logger, "## Envío de tamaño de bloque al Worker %s: no se pudo escribir en el buffer - Socket %d", client_data->client_id, client_data->client_socket);
         return NULL;
     }
