@@ -13,6 +13,13 @@
 
 #define MODULO "QUERY_CONTROL"
 
+// Abstraccion de manejo de errores
+static inline int fail_pkg(t_log* logger, const char* msg, t_package** pkgr, int code) {
+    if (logger && msg) log_error(logger, "%s", msg);
+    if (pkgr && *pkgr) { package_destroy(*pkgr); *pkgr = NULL; }
+    return code;
+}
+
 int main(int argc, char* argv[])
 {
     char* config_filepath = argv[1];
@@ -130,7 +137,7 @@ int main(int argc, char* argv[])
 
 
     // === Loop de recepción: READ / FIN ===
-    for (;;) {
+    while (true) {
     t_package *resp = package_receive(master_socket);
 
     if (!resp) {
@@ -148,18 +155,14 @@ int main(int argc, char* argv[])
             void* file_data = package_read_data(resp, &size);
 
             if(file_tag == NULL){
-                log_error(logger, "El fileTag recivido es nulo");
-                //TODO, encapsular manejo de error en una funcion auxiliar
-                package_destroy(resp);
-                retval=-7; 
+                retval = fail_pkg(logger, "El fileTag recivido es nulo", &resp, -7);
                 goto clean_socket;
 
             }
             else if(file_data == NULL){
+                 retval = fail_pkg(logger, "", &resp, -7); 
                  log_error(logger, "No se leyo ningun dato del archivo %s", file_tag);  
                  free(file_tag); 
-                 package_destroy(resp); 
-                 retval=-7; 
                  goto clean_socket;             
             } 
 
@@ -167,11 +170,8 @@ int main(int argc, char* argv[])
             char* contenido = malloc(size + 1);
 
             if (!contenido) {
-                log_error(logger, "Memoria insuficiente al procesar READ_DATA");
+                retval = fail_pkg(logger, "Memoria insuficiente al procesar READ_DATA", &resp, -7);
                 free(file_tag); free(file_data);
-                package_destroy(resp);
-                retval = -7;
-                //Ok el goto?
                 goto clean_socket;
             }
             memcpy(contenido, file_data, size);
@@ -192,9 +192,8 @@ int main(int argc, char* argv[])
             */
             uint8_t motivo = 1;
             if (!package_read_uint8(resp, &motivo)) {
-                log_error(logger, "Paquete FIN inválido");
-                package_destroy(resp);
-                retval = -7;
+                // Abstraccion de errores
+                retval = fail_pkg(logger, "Paquete FIN inválido", &resp, -7);
                 goto clean_socket;
             }
             const char* motivoString = (motivo==1) ? "ERROR" : "DESCONEXION";
@@ -217,7 +216,6 @@ int main(int argc, char* argv[])
     package_destroy(resp);
 }
 
-
     package_destroy(package_to_send);
     package_destroy(response_package);
 
@@ -229,4 +227,7 @@ clean_config:
     destroy_query_control_config_instance(query_control_config);
 error:
     return retval;
+
+
+
 }
