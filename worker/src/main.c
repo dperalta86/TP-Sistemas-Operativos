@@ -57,7 +57,10 @@ int main(int argc, char *argv[])
     }
 
     uint16_t block_size;
-    get_block_size(client_socket_storage, &block_size);
+    if(get_block_size(client_socket_storage, &block_size)) 
+    {
+       goto clean; 
+    }
     worker_config->block_size = (int)block_size;
     log_info(logger, "## Tamaño de bloque recibido desde Storage: %d", worker_config->block_size);
 
