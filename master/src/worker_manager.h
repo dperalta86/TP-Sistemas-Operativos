@@ -52,6 +52,14 @@ typedef struct worker_table {
  */
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master);
 
+/**
+ * @brief Crea un nuevo Worker Control Block (WCB) y lo inicializa.
+ * 
+ * @param table Puntero a la tabla de control de workers.
+ * @param worker_id ID del Worker como cadena.
+ * @param socket_fd Descriptor de archivo del socket del Worker.
+ * @return t_worker_control_block* Puntero al nuevo WCB creado, o NULL en caso de error.
+ */
 t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, int socket_fd);
 
 #endif

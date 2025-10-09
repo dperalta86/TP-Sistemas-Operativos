@@ -65,8 +65,24 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
  */
 int generate_query_id(t_master *master);
 
+/**
+ * @brief Maneja el handshake inicial con un Query Control.
+ *
+ * Esta función envía un paquete de handshake al Query Control que se ha conectado.
+ * Si el paquete no se puede crear o enviar, se registran errores en el log.
+ *
+ * @param client_socket El socket del cliente (Query Control) que se ha conectado.
+ * @param logger Puntero al logger para registrar mensajes de log.
+ * @return 0 si el handshake fue exitoso, -1 si hubo un error al crear el paquete,
+ *         -2 si hubo un error al enviar el paquete.
+ */
 int manage_query_handshake(int client_socket, t_log *logger);
 
+/**
+ * @brief Crea y inicializa un nuevo bloque de control de query (QCB).
+ * 
+ * Luego de crear la estructura, la agrega a la tabla de queries y a la cola de ready.
+ */
 t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int assigned_worker_id);
 
 #endif // QUERY_CONTROL_MANAGER_H
