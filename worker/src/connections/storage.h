@@ -24,4 +24,10 @@ int handshake_with_storage(const char *storage_ip, const char *storage_port, cha
  */
 int get_block_size(int storage_socket, uint16_t *block_size);
 
+int create_file_in_storage(int storage_socket, char *file, char *tag);
+int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t size);
+int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst);
+int commit_file_in_storage(int storage_socket, char *file, char *tag);
+int delete_file_in_storage(int storage_socket, char *file, char *tag);
+
 #endif

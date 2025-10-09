@@ -6,6 +6,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <commons/string.h>
+#include <connections/storage.h>
+#include <connections/master.h>
+#include <memory/memory_manager.h>
 
 typedef enum {
     CREATE,
@@ -67,6 +70,6 @@ typedef struct {
 int fetch_instruction(char *instructions_path, uint32_t program_counter, char **raw_instruction);
 int decode_instruction(char *raw_instruction, instruction_t *instruction);
 void free_instruction(instruction_t *instruction);
-int execute_instruction(const instruction_t *instruction);
+int execute_instruction(const instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager);
 
 #endif

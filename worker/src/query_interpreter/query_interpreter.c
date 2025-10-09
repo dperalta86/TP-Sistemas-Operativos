@@ -209,3 +209,51 @@ void free_instruction(instruction_t *instruction) {
             break;
     }
 }
+
+int execute_instruction(instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager) {
+    if (instruction == NULL) {
+        return -1;
+    }
+
+    switch(instruction->operation) {
+        case CREATE:
+            create_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            break;
+        case TRUNCATE:
+            // REMINDER: Previamente se debe verificar que el size sea múltiplo del tamaño del bloque
+            truncate_file_in_storage(socket_storage, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size);
+            break;
+        case WRITE:
+            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            if (page_table == NULL) {
+                page_table = mm_get_or_create_page_table(memory_manager, instruction->write.file, instruction->write.tag, 1);
+            }
+            
+            break;
+        case READ:
+            // Lógica para ejecutar la instrucción READ
+            break;
+        case TAG:
+            // Lógica para ejecutar la instrucción TAG
+            fork_file_in_storage(socket_storage, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst);
+            break;
+        case COMMIT:
+            // REMINDER: Previamente se debe hacer un flush
+            commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            break;
+        case FLUSH:
+            // Lógica para ejecutar la instrucción FLUSH
+            break;
+        case DELETE:
+            delete_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            break;
+        case END:
+            // Lógica para ejecutar la instrucción END
+            // TODO: Buscar una forma de obtener el worker_id
+            break;
+        default:
+            return -1;
+    }
+
+    return 0;
+}

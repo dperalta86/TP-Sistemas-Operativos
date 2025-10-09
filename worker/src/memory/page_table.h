@@ -1,5 +1,5 @@
-#ifndef MEMORY_H
-#define MEMORY_H
+#ifndef PAGE_TABLE_H
+#define PAGE_TABLE_H
 
 #include <stdint.h>
 
@@ -14,6 +14,7 @@ typedef struct
     uint32_t page_count;
     size_t page_size;
 } page_table_t;
+
 
 page_table_t *pt_create(uint32_t page_count, size_t page_size);
 void pt_destroy(page_table_t *page_table);
