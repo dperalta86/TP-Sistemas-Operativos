@@ -58,12 +58,14 @@ int main(int argc, char* argv[]) {
 
     log_debug(g_storage_logger, "Logger creado exitosamente.");
     log_debug(g_storage_logger,
-              "Configuracion leida: \\n\\tPUERTO_ESCUCHA=%s\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
+              "Configuracion leida: \\n\\tPUERTO_ESCUCHA=%s\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tTAMAÑO_FS=%d\\n\\tTAMAÑO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
               g_storage_config->storage_port,
               g_storage_config->fresh_start ? "TRUE" : "FALSE",
               g_storage_config->mount_point,
               g_storage_config->operation_delay,
               g_storage_config->block_access_delay,
+              g_storage_config->fs_size,
+              g_storage_config->block_size,
               log_level_as_string(g_storage_config->log_level));
 
     // Verifica si se realiza fresh start

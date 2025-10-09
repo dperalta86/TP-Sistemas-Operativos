@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Se deben ingresar los argumentos [archivo_config] y [ID Worker]");
+        fprintf(stderr, "Se deben ingresar los argumentos [archivo_config] y [ID Worker]\n");
         goto error;
     }
 
@@ -55,6 +55,14 @@ int main(int argc, char *argv[])
     {
         goto clean;
     }
+
+    uint16_t block_size;
+    if(get_block_size(client_socket_storage, &block_size)) 
+    {
+       goto clean; 
+    }
+    worker_config->block_size = (int)block_size;
+    log_info(logger, "## Tamaño de bloque recibido desde Storage: %d", worker_config->block_size);
 
     destroy_worker_config(worker_config);
     logger_destroy();
