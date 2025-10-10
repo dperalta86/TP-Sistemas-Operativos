@@ -24,6 +24,7 @@ typedef struct {
     int worker_id;
     char *ip_address; // Ver si es necesasrio guardar la IP y el puerto
     int port;
+    int socket_fd;
     int current_query_id;
     t_worker_state state;
 } t_worker_control_block;

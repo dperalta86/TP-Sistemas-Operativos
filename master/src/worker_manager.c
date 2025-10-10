@@ -57,8 +57,9 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
 
     t_worker_control_block *wcb = malloc(sizeof(t_worker_control_block));
     wcb->worker_id = atoi(worker_id);
-    wcb->ip_address = NULL; // TODO: Obtener IP del socket
+    wcb->ip_address = NULL; // TODO: Obtener IP del socket (entiendo que con el socket ya es suficiente)
     wcb->port = -1; // TODO: Obtener puerto del socket
+    wcb->socket_fd = socket_fd; // Necesito el socket para enviar las queries
     wcb->current_query_id = -1; // No tiene query asignada inicialmente
     wcb->state = WORKER_STATE_IDLE; // Nuevo worker comienza en estado IDLE
 
