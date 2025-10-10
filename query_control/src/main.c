@@ -200,6 +200,7 @@ int main(int argc, char* argv[])
             memcpy(contenido, file_data, size);
             contenido[size] = '\0';
 
+            // Estructura <File:Tag> debe venir de master en un solo string listo para logear
             log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
 
             free(file_tag);
