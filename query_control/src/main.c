@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
             void* file_data = package_read_data(resp, &size);
 
             if(file_tag == NULL){
-                retval = fail_pkg(logger, "El fileTag recivido es nulo", &resp, -7);
+                retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
                 goto clean_socket;
 
             }
