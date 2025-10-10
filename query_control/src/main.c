@@ -211,10 +211,6 @@ int main(int argc, char* argv[])
         case QC_OP_MASTER_FIN_DESCONEXION:
         case QC_OP_MASTER_FIN_PRIORIDAD: {
 
-            if (!resp) {
-                retval = fail_pkg(logger, "Paquete FIN inválido", &resp, -7);
-                goto clean_socket;
-            }
 
             const char* motivoString =
             (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
