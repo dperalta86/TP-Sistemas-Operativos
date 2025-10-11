@@ -7,7 +7,7 @@ int handshake_with_master(const char *master_ip,
     return handshake_with_server("Master",
                                  master_ip,
                                  master_port,
-                                 OP_WORKER_HANDSHAKE_REQ,
-                                 OP_WORKER_HANDSHAKE_RES,
+                                 OP_WORKER_HANDSHAKE,
+                                 OP_WORKER_ACK,
                                  worker_id);
 }
