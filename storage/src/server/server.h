@@ -14,6 +14,7 @@
 #include "globals/globals.h"
 #include "connection/serialization.h"
 #include "operations/handshake.h"
+#include "operations/send_block_size.h"
 
 int wait_for_client(int server_socket);
 void* handle_client(void* arg);

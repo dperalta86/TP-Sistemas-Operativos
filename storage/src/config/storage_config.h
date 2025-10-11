@@ -2,6 +2,7 @@
 #define STORAGE_CONFIG_H
 
 #include <commons/config.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

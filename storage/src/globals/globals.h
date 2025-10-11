@@ -11,6 +11,8 @@ typedef struct {
     char* mount_point;
     int operation_delay;
     int block_access_delay;
+    int fs_size;
+    int block_size;
     t_log_level log_level;
 } t_storage_config;
 
