@@ -1,4 +1,6 @@
 #include "common.h"
+#include "connection/protocol.h"
+#include "connection/serialization.h"
 
 int handshake_with_server(const char *server_name,
                           const char *ip,

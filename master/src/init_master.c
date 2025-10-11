@@ -18,15 +18,15 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
         log_error(logger, "No se pudo asignar memoria para la tabla de queries");
         goto error;
     }
-    master->queries_table->query_list = NULL;
+    master->queries_table->query_list = list_create();
     master->queries_table->total_queries = 0;
     master->queries_table->next_query_id = -1; // Comienza en 0, se incrementa con cada nueva query
 
-    // Inicializar listas de estados
-    master->queries_table->ready_queue = NULL;
-    master->queries_table->running_list = NULL;
-    master->queries_table->completed_list = NULL;
-    master->queries_table->canceled_list = NULL;
+    // Crear e inicializar listas de estados (utilizando las commons)
+    master->queries_table->ready_queue = list_create();
+    master->queries_table->running_list = list_create();
+    master->queries_table->completed_list = list_create();
+    master->queries_table->canceled_list = list_create();
     pthread_mutex_init(&master->queries_table->query_table_mutex, NULL);
 
     master->workers_table = malloc(sizeof(t_worker_table));
@@ -34,11 +34,11 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
         log_error(logger, "No se pudo asignar memoria para la tabla de workers");
         goto error;
     }
-    master->workers_table->worker_list = NULL;
+    master->workers_table->worker_list = list_create();
     master->workers_table->total_workers_connected = 0;
-    master->workers_table->idle_list = NULL;
-    master->workers_table->busy_list = NULL;
-    master->workers_table->disconnected_list = NULL;
+    master->workers_table->idle_list = list_create();
+    master->workers_table->busy_list = list_create();
+    master->workers_table->disconnected_list = list_create();
     pthread_mutex_init(&master->workers_table->worker_table_mutex, NULL);
 
     // Inicializar datos de configuración
