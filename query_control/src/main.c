@@ -150,8 +150,8 @@ int main(int argc, char* argv[])
 
     // Preparo para recibir respuesta
     response_package = package_receive(master_socket); 
-
-    if (response_package->operation_code != QC_OP_MASTER_CONNECTION_OK)
+    
+    if (!response_package || response_package->operation_code != QC_OP_MASTER_CONNECTION_OK)
     {
         retval = fail_pkg(logger, "Error al recibir respuesta de conexión de Master", &response_package, -7); 
     }
