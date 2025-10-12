@@ -211,13 +211,16 @@ void free_instruction(instruction_t *instruction) {
 }
 
 int execute_instruction(instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager, int query_id, int worker_id) {
-    if (instruction == NULL) {
+    if (instruction == NULL || memory_manager == NULL) {
         return -1;
     }
 
     switch(instruction->operation) {
         case CREATE:
-            // create_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            int result = create_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            if (result != 0) {
+                return -1;
+            }
             break;
         case TRUNCATE:
             if (instruction->truncate.size % memory_manager->page_size != 0) {

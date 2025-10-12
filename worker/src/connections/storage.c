@@ -45,6 +45,41 @@ int get_block_size(int storage_socket, uint16_t *block_size) {
     return 0;
 }
 
+int create_file_in_storage(int storage_socket, char *file, char *tag)
+{
+    t_log *logger = logger_get();
+    t_package *request_package = package_create_empty(STORAGE_OP_FILE_CREATE_REQ);
+    if (!request_package) {
+        log_error(logger, "Error al crear el paquete para solicitar la creación de un archivo");
+        return -1;
+    }
+    if (!package_add_string(request_package, file) ||
+        !package_add_string(request_package, tag)) {
+        log_error(logger, "Error al agregar datos al buffer del package");
+        package_destroy(request_package);
+        return -1;
+    }
+    if(package_send(request_package, storage_socket) != 0) {
+        log_error(logger, "Error al enviar la solicitud de creación de archivo al Storage");
+        package_destroy(request_package);
+        return -1;
+    }
+    package_destroy(request_package);
+    t_package *response_package = package_receive(storage_socket);
+    if (!response_package) {
+        log_error(logger, "Error al recibir la respuesta a create del Storage");
+        return -1;
+    }
+    if (response_package->operation_code != STORAGE_OP_FILE_CREATE_RES) {
+        log_error(logger, "Tipo de paquete inesperado para la respuesta a create");
+        package_destroy(response_package);
+        return -1;
+    }
+
+    package_destroy(response_package);
+    return 0;
+}
+
 int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst){
     t_log *logger = logger_get();
     t_package *request_package = package_create_empty(STORAGE_OP_TAG_CREATE_REQ);
