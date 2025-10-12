@@ -14,7 +14,7 @@ int handshake_with_master(const char *master_ip,
 
 int end_query_in_master(int socket_master, int worker_id, int query_id){
     t_log *logger = logger_get();
-        if (socket_master < 0 || worker_id == NULL) {
+        if (socket_master < 0) {
         log_error(logger, "Socket de Master inválido o worker_id nulo");
         return -1;
     }
@@ -58,7 +58,7 @@ int end_query_in_master(int socket_master, int worker_id, int query_id){
     // Libero memoria
     if(request_package)
     {
-        (request_package);
+        package_destroy(request_package);
     }
     if(response)
     {
