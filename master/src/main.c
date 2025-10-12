@@ -160,20 +160,34 @@ void* handle_client(void* arg) {
                 break;
             
             // Worker
-                case OP_WORKER_HANDSHAKE_REQ:
+            case OP_WORKER_HANDSHAKE_REQ:
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
-                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
+                    log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
                 }              
+                break;
+            case OP_WORKER_READ_MESSAGE_REQ:
+                log_debug(master->logger, "Recibido OP_WORKER_READ_MESSAGE de socket %d", client_socket);
+                if (manage_read_message_from_worker(required_package->buffer, client_socket, master) != 0) {
+                    log_error(master->logger, "Error al manejar OP_WORKER_READ_MESSAGE del cliente %d", client_socket);
+                }
                 break;
             default:
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);
                 break;
         }
-        package_destroy(required_package); // Libera el paquete recibido
+        if(required_package)
+        {
+            package_destroy(required_package); // Libera el paquete recibido
+        }
+            
     }
 
     close(client_socket);
-    free(client_data);
+    if(client_data)
+    {
+        free(client_data);
+    }
+        
     return NULL;
 }

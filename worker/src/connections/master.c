@@ -8,6 +8,6 @@ int handshake_with_master(const char *master_ip,
                                  master_ip,
                                  master_port,
                                  OP_WORKER_HANDSHAKE_REQ,
-                                 OP_WORKER_HANDSHAKE_RES,
+                                 OP_WORKER_ACK,
                                  worker_id);
 }

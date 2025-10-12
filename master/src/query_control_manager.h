@@ -9,6 +9,7 @@
 #include <connection/protocol.h>
 #include <connection/serialization.h>
 #include <commons/log.h>
+#include <commons/collections/list.h>
 #include <pthread.h>
 #include <commons/log.h>
 
@@ -25,6 +26,7 @@ typedef enum {
 } t_query_state;
 
 typedef struct {
+    int socket_fd;
     int query_id;
     char *query_file_path;
     int priority;
@@ -35,13 +37,13 @@ typedef struct {
 } t_query_control_block;
 
 typedef struct query_table {
-    t_query_control_block *query_list; // Lista de t_query_control_block
+    t_list *query_list; // Lista de t_query_control_block
 
     // Manejo de estados
-    t_query_control_block *ready_queue;   // Cola de queries listas para ejecutar
-    t_query_control_block *running_list; // Lista de queries en ejecución
-    t_query_control_block *completed_list; // Lista de queries completadas
-    t_query_control_block *canceled_list; // Lista de queries canceladas
+    t_list *ready_queue;   // Cola de queries listas para ejecutar
+    t_list *running_list; // Lista de queries en ejecución
+    t_list *completed_list; // Lista de queries completadas
+    t_list *canceled_list; // Lista de queries canceladas
 
     int total_queries;
     int next_query_id; // ID para la próxima query que se agregue
@@ -64,6 +66,24 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
  */
 int generate_query_id(t_master *master);
 
+/**
+ * @brief Maneja el handshake inicial con un Query Control.
+ *
+ * Esta función envía un paquete de handshake al Query Control que se ha conectado.
+ * Si el paquete no se puede crear o enviar, se registran errores en el log.
+ *
+ * @param client_socket El socket del cliente (Query Control) que se ha conectado.
+ * @param logger Puntero al logger para registrar mensajes de log.
+ * @return 0 si el handshake fue exitoso, -1 si hubo un error al crear el paquete,
+ *         -2 si hubo un error al enviar el paquete.
+ */
 int manage_query_handshake(int client_socket, t_log *logger);
 
-#endif
+/**
+ * @brief Crea y inicializa un nuevo bloque de control de query (QCB).
+ * 
+ * Luego de crear la estructura, la agrega a la tabla de queries y a la cola de ready.
+ */
+t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int socket_fd);
+
+#endif // QUERY_CONTROL_MANAGER_H
