@@ -234,9 +234,9 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case WRITE: {
-            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             if (page_table == NULL) {
-                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+                return -1;
             }
             int result = mm_write_to_memory(memory_manager, page_table, instruction->write.base, instruction->write.data, strlen((char*)instruction->write.data));
             if (result != 0) {
@@ -245,9 +245,9 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case READ: {
-            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->read.file, instruction->read.tag);
             if (page_table == NULL) {
-                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+                return -1;
             }
             uint8_t *buffer = malloc(instruction->read.size);
             if (buffer == NULL) {
@@ -258,24 +258,24 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
                 free(buffer);
                 return -1;
             }
-            // int send_result = send_read_content_to_master(socket_master, buffer, instruction->read.size, query_id, worker_id);
-            // if (send_result != 0) {
-            //     free(buffer);
-            //     return -1;
-            // }
+            int send_result = send_read_content_to_master(socket_master, buffer, instruction->read.size, query_id, worker_id);
+            if (send_result != 0) {
+                free(buffer);
+                return -1;
+            }
             free(buffer);
             break;
         }
         case TAG:
-            // fork_file_in_storage(socket_storage, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst);
+            fork_file_in_storage(socket_storage, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst);
             break;
         case COMMIT:
-            // commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case FLUSH: {
-            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             if (page_table == NULL) {
-                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+                return -1;
             }
             
             size_t dirty_count = 0;
@@ -293,11 +293,11 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
                     continue;
                 }
 
-                // int result = write_block_to_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, p->page_number, frame_data, memory_manager->page_size);
-                // if (result != 0) {
-                //     free(frame_data);
-                //     continue;
-                // }
+                int result = write_block_to_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, p->page_number, frame_data, memory_manager->page_size);
+                if (result != 0) {
+                    free(frame_data);
+                    continue;
+                }
                 free(frame_data);
             }
 
@@ -306,10 +306,10 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case DELETE:
-            // delete_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
+            delete_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case END:
-            // end_query_in_master(socket_master, worker_id, query_id);
+            end_query_in_master(socket_master, worker_id, query_id);
             break;
         default:
             return -1;
