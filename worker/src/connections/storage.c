@@ -80,6 +80,44 @@ int create_file_in_storage(int storage_socket, char *file, char *tag)
     return 0;
 }
 
+int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t size){
+    t_log *logger = logger_get();
+    t_package *request_package = package_create_empty(STORAGE_OP_FILE_TRUNCATE_REQ);
+    if (!request_package) {
+        log_error(logger, "Error al crear el paquete para solicitar el truncate de un archivo");
+        return -1;
+    }
+    if (!package_add_string(request_package, file) ||
+        !package_add_string(request_package, tag) ||
+        !package_add_uint32(request_package, (uint32_t)size)) {
+        log_error(logger, "Error al agregar datos al buffer del package");
+        package_destroy(request_package);
+        return -1;
+    }
+    if(package_send(request_package, storage_socket) != 0) {
+        log_error(logger, "Error al enviar la solicitud truncate al Storage");
+        package_destroy(request_package);
+        return -1;
+    }
+    package_destroy(request_package);
+    t_package *response_package = package_receive(storage_socket);
+    if (!response_package) {
+        log_error(logger, "Error al recibir la respuesta a truncate del Storage");
+        return -1;
+    }
+    if (response_package->operation_code != STORAGE_OP_FILE_TRUNCATE_RES) {
+        log_error(logger, "Tipo de paquete inesperado para la respuesta a truncate");
+        package_destroy(response_package);
+        return -1;
+    }
+    
+    package_destroy(response_package);
+    
+    log_debug(logger, "Truncate del archivo %s:%s a %zu bytes realizado con éxito", file, tag, size);
+    
+    return 0;
+}
+
 int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst){
     t_log *logger = logger_get();
     t_package *request_package = package_create_empty(STORAGE_OP_TAG_CREATE_REQ);

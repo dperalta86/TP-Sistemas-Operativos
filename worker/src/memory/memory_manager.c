@@ -5,6 +5,11 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     memory_manager_t *mm = malloc(sizeof(memory_manager_t));
     if (!mm)
         return NULL;
+    if (memory_size == 0 || page_size == 0)
+    {
+        free(mm);
+        return NULL;
+    }
 
     mm->entries = NULL;
     mm->count = 0;
@@ -49,7 +54,21 @@ page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag)
     return NULL;
 }
 
-page_table_t *mm_get_or_create_page_table(memory_manager_t *mm, char *file, char *tag)
+static void resize_capacity(memory_manager_t *mm)
+{
+    if (mm->count == mm->capacity)
+    {
+        uint32_t new_capacity = mm->capacity == 0 ? 4 : mm->capacity * 2;
+        file_tag_entry_t *new_entries = realloc(mm->entries, new_capacity * sizeof(file_tag_entry_t));
+        if (new_entries)
+        {
+            mm->entries = new_entries;
+            mm->capacity = new_capacity;
+        }
+    }
+}
+
+page_table_t *mm_create_page_table(memory_manager_t *mm, char *file, char *tag)
 {
     if (!mm || !file || !tag)
         return NULL;
@@ -59,19 +78,14 @@ page_table_t *mm_get_or_create_page_table(memory_manager_t *mm, char *file, char
         return page_table;
 
     if (mm->count == mm->capacity)
-    {
-        uint32_t new_capacity = mm->capacity == 0 ? 4 : mm->capacity * 2;
-        file_tag_entry_t *new_entries = realloc(mm->entries, new_capacity * sizeof(file_tag_entry_t));
-        if (!new_entries)
-            return NULL;
-        mm->entries = new_entries;
-        mm->capacity = new_capacity;
-    }
+        resize_capacity(mm);
 
     file_tag_entry_t *new_entry = &mm->entries[mm->count++];
+
     new_entry->file = strdup(file);
     new_entry->tag = strdup(tag);
     new_entry->page_table = pt_create(1, mm->page_size);
+
     if (!new_entry->file || !new_entry->tag || !new_entry->page_table)
     {
         free(new_entry->file);
@@ -122,6 +136,9 @@ int mm_write_to_memory(memory_manager_t *mm,
     size_t bytes_remaining = size;
     const uint8_t *data_ptr = data;
 
+    if (!mm || !page_table || !data || size == 0)
+        return -1;
+
     while (bytes_remaining > 0)
     {
         if (current_page >= page_table->page_count)
@@ -160,6 +177,9 @@ int mm_read_from_memory(memory_manager_t *mm,
                         size_t size,
                         void *out_buffer)
 {
+    if (!mm || !page_table || !out_buffer || size == 0)
+        return -1;
+
     uint32_t page_size = mm->page_size;
     uint32_t current_page = base_address / page_size;
     uint32_t offset = base_address % page_size;

@@ -30,7 +30,7 @@ typedef struct {
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy);
 void mm_destroy(memory_manager_t *mm);
 page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag);
-page_table_t *mm_get_or_create_page_table(memory_manager_t *mm, char *file, char *tag);
+page_table_t *mm_create_page_table(memory_manager_t *mm, char *file, char *tag);
 void mm_remove_page_table(memory_manager_t *mm, char *file, char *tag);
 bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag);
 

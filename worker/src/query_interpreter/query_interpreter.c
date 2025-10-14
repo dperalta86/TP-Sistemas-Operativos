@@ -216,22 +216,27 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
     }
 
     switch(instruction->operation) {
-        case CREATE:
+        case CREATE: {
             int result = create_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             if (result != 0) {
                 return -1;
             }
             break;
-        case TRUNCATE:
+        }
+        case TRUNCATE: {
             if (instruction->truncate.size % memory_manager->page_size != 0) {
                 return -1;
             }
-            // truncate_file_in_storage(socket_storage, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size);
-            break;
-        case WRITE: {
-            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
-            if (page_table == NULL) {
+            int result = truncate_file_in_storage(socket_storage, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size);
+            if (result != 0) {
                 return -1;
+            }
+            break;
+        }
+        case WRITE: {
+            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            if (page_table == NULL) {
+                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             }
             int result = mm_write_to_memory(memory_manager, page_table, instruction->write.base, instruction->write.data, strlen((char*)instruction->write.data));
             if (result != 0) {
@@ -240,9 +245,9 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case READ: {
-            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, instruction->read.file, instruction->read.tag);
+            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             if (page_table == NULL) {
-                return -1;
+                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             }
             uint8_t *buffer = malloc(instruction->read.size);
             if (buffer == NULL) {
@@ -268,9 +273,9 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             // commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case FLUSH: {
-            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
+            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             if (page_table == NULL) {
-                return -1;
+                page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
             }
             
             size_t dirty_count = 0;
