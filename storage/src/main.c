@@ -1,7 +1,6 @@
 #include "fresh_start/fresh_start.h"
 #include "globals/globals.h"
 #include "server/server.h"
-#include "storage_fs.h"
 #include <commons/bitarray.h>
 #include <commons/config.h>
 #include <commons/log.h>
@@ -19,15 +18,10 @@
 #include <utils/utils.h>
 
 #define MODULO "STORAGE"
+#define DEFAULT_CONFIG_PATH "./storage.config"
 #define CONST_FS_SIZE 4096
 #define CONST_BLOCK_SIZE 128
 
-t_storage_config *g_storage_config;
-t_log *g_storage_logger;
-int g_worker_counter = 0;
-
-// semáforos
-pthread_mutex_t g_worker_counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char *argv[]) {
   // Obtiene posibles parametros de entrada
@@ -77,8 +71,7 @@ int main(int argc, char *argv[]) {
             g_storage_config->storage_ip, g_storage_config->storage_port,
             g_storage_config->fresh_start ? "TRUE" : "FALSE",
             g_storage_config->mount_point, g_storage_config->operation_delay,
-            g_storage_config->block_access_delay, g_storage_config->fs_size,
-            g_storage_config->block_size,
+            g_storage_config->block_access_delay,
             log_level_as_string(g_storage_config->log_level));
 
   // Verifica si se realiza fresh start
