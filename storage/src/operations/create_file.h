@@ -24,11 +24,10 @@ t_package *create_file(t_package *package);
  * @param name Nombre del File a crear
  * @param tag Tag inicial del File
  * @param mount_point Path de la carpeta donde está montado el filesystem
- * @param logger Logger para registrar errores y operaciones
  * @return 0 en caso de éxito, -1 si falla la creación de carpetas, -2 si falla
  * la creación de metadata
  */
 int _create_file(uint32_t query_id, const char *name, const char *tag,
-                 const char *mount_point, t_log *logger);
+                 const char *mount_point);
 
 #endif

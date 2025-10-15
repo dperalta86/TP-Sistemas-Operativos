@@ -2,9 +2,10 @@
 #include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <utils/logger.h>
 
 int _create_file(uint32_t query_id, const char *name, const char *tag,
-                 const char *mount_point, t_log *logger) {
+                 const char *mount_point) {
   char target_path[PATH_MAX];
 
   // Crear carpeta del File
@@ -28,19 +29,19 @@ int _create_file(uint32_t query_id, const char *name, const char *tag,
            mount_point, name, tag);
   FILE *metadata_ptr = fopen(target_path, "w");
   if (metadata_ptr == NULL) {
-    log_error(logger, "No se pudo crear el archivo %s", target_path);
+    log_error(g_storage_logger, "No se pudo crear el archivo %s", target_path);
     return -2;
   }
 
   fprintf(metadata_ptr, "SIZE=0\nBLOCKS=[]\nESTADO=WORK_IN_PROGRESS\n");
   fclose(metadata_ptr);
 
-  log_info(logger, "## %u - File Creado: %s:%s", query_id, name, tag);
+  log_info(g_storage_logger, "## %u - File Creado: %s:%s", query_id, name, tag);
 
   return 0;
 
 file_creation_error:
-  log_error(logger, "Error al crear el archivo %s con tag %s", name, tag);
+  log_error(g_storage_logger, "Error al crear el archivo %s con tag %s", name, tag);
   return -1;
 }
 
@@ -63,7 +64,7 @@ t_package *create_file(t_package *package) {
   }
 
   int operation_result = _create_file(
-      query_id, name, tag, g_storage_config->mount_point, g_storage_logger);
+      query_id, name, tag, g_storage_config->mount_point);
 
   free(name);
   free(tag);

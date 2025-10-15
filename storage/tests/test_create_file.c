@@ -34,8 +34,7 @@ context(test_create_file) {
   end
 
             it("crea archivo nuevo con tag correctamente") {
-    int result =
-        _create_file(0, "test_file", "v1", TEST_MOUNT_POINT, test_logger);
+    int result = _create_file(0, "test_file", "v1", TEST_MOUNT_POINT);
 
     should_int(result) be equal to(0);
 
@@ -69,20 +68,18 @@ context(test_create_file) {
   end
 
             it("retorna error si ya existe la carpeta del archivo con el mismo tag") {
-    _create_file(0, "existing_file", "existing_tag", TEST_MOUNT_POINT,
-                 test_logger);
+    _create_file(0, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
-    int result = _create_file(0, "existing_file", "existing_tag",
-                              TEST_MOUNT_POINT, test_logger);
+    int result =
+        _create_file(0, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
     should_int(result) be equal to(-1);
   }
   end
 
             it("crea multiples tags para el mismo archivo") {
-    _create_file(0, "multi_tag_file", "tag1", TEST_MOUNT_POINT, test_logger);
-    int result = _create_file(0, "multi_tag_file", "tag2", TEST_MOUNT_POINT,
-                              test_logger);
+    _create_file(0, "multi_tag_file", "tag1", TEST_MOUNT_POINT);
+    int result = _create_file(0, "multi_tag_file", "tag2", TEST_MOUNT_POINT);
 
     should_int(result) be equal to(0);
 
