@@ -1,7 +1,6 @@
-#include <limits.h>
-
 #ifndef ERRORS_H
 #define ERRORS_H
+#include <limits.h>
 
 enum STORAGE_ERROR_CODES {
   FILE_TAG_MISSING = INT_MIN,
