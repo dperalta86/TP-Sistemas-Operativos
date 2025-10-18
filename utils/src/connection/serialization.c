@@ -149,7 +149,7 @@ static bool buffer_check_capacity(t_buffer *buffer, size_t required_size)
 
 bool buffer_write_uint8(t_buffer *buffer, uint8_t value)
 {
-    if (!buffer_has_capacity(buffer, sizeof(uint8_t))) 
+    if (!buffer_has_capacity(buffer, sizeof(uint8_t)))
     {
         return false;
     }
@@ -157,6 +157,20 @@ bool buffer_write_uint8(t_buffer *buffer, uint8_t value)
 
     memcpy(next_position, &value, sizeof(uint8_t));
     buffer->offset += sizeof(uint8_t);
+
+    return true;
+}
+
+bool buffer_write_int8(t_buffer *buffer, int8_t value)
+{
+    if (!buffer_has_capacity(buffer, sizeof(int8_t)))
+    {
+        return false;
+    }
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+
+    memcpy(next_position, &value, sizeof(int8_t));
+    buffer->offset += sizeof(int8_t);
 
     return true;
 }
@@ -258,7 +272,20 @@ bool buffer_read_uint8(t_buffer *buffer, uint8_t *value)
     uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
     memcpy(value, next_position, sizeof(uint8_t));
     buffer->offset += sizeof(uint8_t);
-    
+
+    return true;
+}
+
+bool buffer_read_int8(t_buffer *buffer, int8_t *value)
+{
+    if (!buffer || !value || !buffer_check_capacity(buffer, sizeof(int8_t))) {
+        return false;
+    }
+
+    uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
+    memcpy(value, next_position, sizeof(int8_t));
+    buffer->offset += sizeof(int8_t);
+
     return true;
 }
 
@@ -405,6 +432,14 @@ bool package_add_uint8(t_package *package, uint8_t value)
     return buffer_write_uint8(package->buffer, value);
 }
 
+bool package_add_int8(t_package *package, int8_t value)
+{
+    if (!package || !package->buffer) {
+        return false;
+    }
+    return buffer_write_int8(package->buffer, value);
+}
+
 bool package_add_uint16(t_package *package, uint16_t value)
 {
     if (!package || !package->buffer) {
@@ -444,6 +479,14 @@ bool package_read_uint8(t_package *package, uint8_t *value)
         return false;
     }
     return buffer_read_uint8(package->buffer, value);
+}
+
+bool package_read_int8(t_package *package, int8_t *value)
+{
+    if (!package || !package->buffer) {
+        return false;
+    }
+    return buffer_read_int8(package->buffer, value);
 }
 
 bool package_read_uint16(t_package *package, uint16_t *value)

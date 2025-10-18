@@ -60,7 +60,7 @@ t_package *create_file(t_package *package) {
     return NULL;
   }
 
-  if (!package_add_uint8(response, (uint8_t)operation_result)) {
+  if (!package_add_int8(response, (int8_t)operation_result)) {
     log_error(g_storage_logger,
               "## Error al escribir status en respuesta de CREATE_FILE");
     package_destroy(response);

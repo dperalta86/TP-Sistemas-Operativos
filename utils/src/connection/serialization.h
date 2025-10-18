@@ -38,6 +38,7 @@ void buffer_reset_offset(t_buffer *buffer);
 
 // Funciones de escritura
 bool buffer_write_uint8(t_buffer *buffer, uint8_t value);
+bool buffer_write_int8(t_buffer *buffer, int8_t value);
 bool buffer_write_uint16(t_buffer *buffer, uint16_t value);
 bool buffer_write_uint32(t_buffer *buffer, uint32_t value);
 bool buffer_write_string(t_buffer *buffer, const char *value);
@@ -45,6 +46,7 @@ bool buffer_write_data(t_buffer *buffer, const void *data, size_t data_size);
 
 // Funciones de lectura
 bool buffer_read_uint8(t_buffer *buffer, uint8_t *value);
+bool buffer_read_int8(t_buffer *buffer, int8_t *value);
 bool buffer_read_uint16(t_buffer *buffer, uint16_t *value);
 bool buffer_read_uint32(t_buffer *buffer, uint32_t *value);
 char *buffer_read_string(t_buffer *buffer);
@@ -63,6 +65,7 @@ t_package *package_receive(int socket);
 // NUEVA API SIMPLIFICADA - Recomendada para usar
 t_package *package_create_empty(uint8_t operation_code);
 bool package_add_uint8(t_package *package, uint8_t value);
+bool package_add_int8(t_package *package, int8_t value);
 bool package_add_uint16(t_package *package, uint16_t value);
 bool package_add_uint32(t_package *package, uint32_t value);
 bool package_add_string(t_package *package, const char *value);
@@ -74,6 +77,7 @@ bool package_add_data(t_package *package, const void *data, size_t size);
 
 // Funciones de lectura simplificadas del paquete recibido
 bool package_read_uint8(t_package *package, uint8_t *value);
+bool package_read_int8(t_package *package, int8_t *value);
 bool package_read_uint16(t_package *package, uint16_t *value);
 bool package_read_uint32(t_package *package, uint32_t *value);
 char *package_read_string(t_package *package);
