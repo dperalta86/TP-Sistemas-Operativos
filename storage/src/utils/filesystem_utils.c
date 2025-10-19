@@ -3,11 +3,14 @@
 #include "../globals/globals.h"
 #include <commons/bitarray.h>
 #include <commons/config.h>
+#include <commons/string.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <utils/logger.h>
+#include <utils/utils.h>
 
 int create_dir_recursive(const char *path) {
   char command[PATH_MAX + 20];
@@ -197,4 +200,123 @@ clean_file:
     fclose(bitmap_file);
 end:
   return retval;
+}
+
+t_file_metadata *read_file_metadata(const char *mount_point,
+                                    const char *filename, const char *tag) {
+  char metadata_path[PATH_MAX];
+  snprintf(metadata_path, sizeof(metadata_path),
+           "%s/files/%s/%s/metadata.config", mount_point, filename, tag);
+
+  t_config *config = config_create(metadata_path);
+  if (!config) {
+    log_error(g_storage_logger, "No se pudo abrir el metadata.config: %s",
+              metadata_path);
+    return NULL;
+  }
+
+  if (!config_has_property(config, "SIZE") ||
+      !config_has_property(config, "BLOCKS") ||
+      !config_has_property(config, "ESTADO")) {
+    log_error(g_storage_logger,
+              "El metadata.config no tiene las propiedades requeridas "
+              "(SIZE, BLOCKS, ESTADO)");
+    config_destroy(config);
+    return NULL;
+  }
+
+  t_file_metadata *metadata = malloc(sizeof(t_file_metadata));
+  if (!metadata) {
+    log_error(g_storage_logger,
+              "No se pudo asignar memoria para t_file_metadata");
+    config_destroy(config);
+    return NULL;
+  }
+
+  metadata->size = config_get_int_value(config, "SIZE");
+
+  char *state_value = config_get_string_value(config, "ESTADO");
+  metadata->state = string_duplicate(state_value);
+
+  char **blocks_str = config_get_array_value(config, "BLOCKS");
+  metadata->block_count = string_array_size(blocks_str);
+
+  if (metadata->block_count > 0) {
+    metadata->blocks = malloc(sizeof(int) * metadata->block_count);
+    if (!metadata->blocks) {
+      log_error(g_storage_logger,
+                "No se pudo asignar memoria para el array de bloques");
+      free(metadata->state);
+      free(metadata);
+      config_destroy(config);
+      return NULL;
+    }
+
+    for (int i = 0; i < metadata->block_count; i++) {
+      metadata->blocks[i] = atoi(blocks_str[i]);
+    }
+  } else {
+    metadata->blocks = NULL;
+  }
+
+  metadata->config = config;
+
+  log_info(g_storage_logger,
+           "Metadata leído: %s:%s - SIZE=%d, BLOCKS=%d, ESTADO=%s", filename,
+           tag, metadata->size, metadata->block_count, metadata->state);
+
+  return metadata;
+}
+
+int save_file_metadata(t_file_metadata *metadata) {
+  if (!metadata || !metadata->config) {
+    log_error(g_storage_logger, "Metadata o config es NULL");
+    return -1;
+  }
+
+  char field_str[32];
+  snprintf(field_str, sizeof(field_str), "%d", metadata->size);
+  config_set_value(metadata->config, "SIZE", field_str);
+
+  // Si no tenemos BLOCKS, escribimos `[]`
+  char *stringified_blocks;
+  if (metadata->blocks == NULL || metadata->block_count == 0) {
+    stringified_blocks = string_duplicate("[]");
+  } else {
+    char **blocks_str_array = string_array_new();
+
+    for (int i = 0; i < metadata->block_count; i++) {
+      snprintf(field_str, sizeof(field_str), "%d", metadata->blocks[i]);
+      string_array_push(&blocks_str_array, string_duplicate(field_str));
+    }
+
+    stringified_blocks = get_stringified_array(blocks_str_array);
+    string_array_destroy(blocks_str_array);
+  }
+
+  config_set_value(metadata->config, "BLOCKS", stringified_blocks);
+  free(stringified_blocks);
+
+  config_set_value(metadata->config, "ESTADO", metadata->state);
+
+  config_save(metadata->config);
+  log_info(g_storage_logger, "Metadata guardada");
+  return 0;
+}
+
+void destroy_file_metadata(t_file_metadata *metadata) {
+  if (!metadata) {
+    return;
+  }
+
+  if (metadata->blocks)
+    free(metadata->blocks);
+
+  if (metadata->state)
+    free(metadata->state);
+
+  if (metadata->config)
+    config_destroy(metadata->config);
+
+  free(metadata);
 }
