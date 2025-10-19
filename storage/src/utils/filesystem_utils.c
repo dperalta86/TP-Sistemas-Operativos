@@ -86,3 +86,23 @@ int create_metadata_file(const char *mount_point, const char *file_name,
 
   return 0;
 }
+
+// TODO: Aplicar en otras funciones
+int file_dir_exists(const char *mount_point, const char*file_name, const char *tag) {
+  char tag_path[PATH_MAX];
+  struct stat st;
+
+  snprintf(tag_path, sizeof(tag_path), "%s/files/%s/%s", mount_point, file_name, tag);
+
+  return (stat(tag_path, &st) == 0 && S_ISDIR(st.st_mode)) ? 0 : -1;
+}
+
+t_package *prepare_error_response(uint32_t query_id, t_storage_op_code op_error_code) {
+  t_package *response = package_create_empty(op_error_code);
+  if(!response)
+  {
+    log_error(g_storage_logger, "## Handshake del Worker %s: no se pudo crear el paquete de respuesta - Socket: %d", client_data->client_id, client_data->client_socket);
+
+    return NULL;
+  }
+}
