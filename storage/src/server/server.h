@@ -14,6 +14,14 @@
 #include "globals/globals.h"
 #include "connection/serialization.h"
 #include "operations/handshake.h"
+#include "operations/send_block_size.h"
+#include "operations/create_file.h"
+#include "operations/truncate_file.h"
+#include "operations/create_tag.h"
+#include "operations/commit_tag.h"
+#include "operations/write_block.h"
+#include "operations/read_block.h"
+#include "operations/delete_tag.h"
 
 int wait_for_client(int server_socket);
 void* handle_client(void* arg);

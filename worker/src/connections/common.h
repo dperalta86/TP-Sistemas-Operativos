@@ -1,7 +1,6 @@
 #ifndef CONNECTION_COMMON_H
 #define CONNECTION_COMMON_H
 
-#include <connection/serialization.h>
 #include <utils/logger.h>
 #include <utils/client_socket.h>
 #include <connection/protocol.h>

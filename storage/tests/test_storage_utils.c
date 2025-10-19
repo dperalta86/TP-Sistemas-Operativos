@@ -1,5 +1,5 @@
 #include "../src/globals/globals.h"
-#include "../src/storage_utils.h"
+#include "../src/utils/filesystem_utils.h"
 #include "test_utils.h"
 #include <cspecs/cspec.h>
 #include <limits.h>
@@ -155,9 +155,7 @@ context(test_storage_utils) {
       fwrite(bitmap_data, 1, bitmap_size, bitmap_file);
       fclose(bitmap_file);
 
-      // Setear algunos bits
-      int indexes[] = {0, 2, 5};
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, indexes, 3, 1);
+      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 0, 3, 1);
 
       should_int(result) be equal to(0);
 
@@ -166,10 +164,10 @@ context(test_storage_utils) {
       fread(bitmap_data, 1, bitmap_size, bitmap_file);
       fclose(bitmap_file);
 
-      // Los bits 0, 2, 5 deberían estar en 1
-      should_int(bitmap_data[0] & 0x80) not be equal to(0); // bit 0
-      should_int(bitmap_data[0] & 0x20) not be equal to(0); // bit 2
-      should_int(bitmap_data[0] & 0x04) not be equal to(0); // bit 5
+      // Los bits 0, 1, 2 deberían estar en 1
+      should_int(bitmap_data[0] & 0x80) not be equal to(0);
+      should_int(bitmap_data[0] & 0x40) not be equal to(0);
+      should_int(bitmap_data[0] & 0x20) not be equal to(0);
 
       free(bitmap_data);
     }
@@ -178,7 +176,6 @@ context(test_storage_utils) {
     it("unsetea bits correctamente") {
       create_test_superblock(TEST_MOUNT_POINT);
 
-      // Crear bitmap inicial con todos los bits en 1
       char bitmap_path[PATH_MAX];
       snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
                TEST_MOUNT_POINT);
@@ -191,29 +188,26 @@ context(test_storage_utils) {
       fwrite(bitmap_data, 1, bitmap_size, bitmap_file);
       fclose(bitmap_file);
 
-      // Unsetear algunos bits
-      int indexes[] = {1, 3, 6};
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, indexes, 3, 0);
+      // Unsetear los bits 3-5
+      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 3, 3, 0);
 
       should_int(result) be equal to(0);
 
-      // Verificar que los bits se unsetearon correctamente
       bitmap_file = fopen(bitmap_path, "rb");
       fread(bitmap_data, 1, bitmap_size, bitmap_file);
       fclose(bitmap_file);
 
-      // Los bits 1, 3, 6 deberían estar en 0
-      should_int(bitmap_data[0] & 0x40) be equal to(0); // bit 1
-      should_int(bitmap_data[0] & 0x10) be equal to(0); // bit 3
-      should_int(bitmap_data[0] & 0x02) be equal to(0); // bit 6
+      // Los bits 3, 4, 5 deberían estar en 0
+      should_int(bitmap_data[0] & 0x10) be equal to(0);
+      should_int(bitmap_data[0] & 0x08) be equal to(0);
+      should_int(bitmap_data[0] & 0x04) be equal to(0);
 
       free(bitmap_data);
     }
     end
 
     it("retorna error para superblock inexistente") {
-      int indexes[] = {0, 1};
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, indexes, 2, 1);
+      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 0, 2, 1);
 
       should_int(result) be equal to(-1);
     }
@@ -221,10 +215,8 @@ context(test_storage_utils) {
 
     it("retorna error para bitmap inexistente") {
       create_test_superblock(TEST_MOUNT_POINT);
-      // No crear bitmap.bin
 
-      int indexes[] = {0, 1};
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, indexes, 2, 1);
+      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 0, 2, 1);
 
       should_int(result) be equal to(-1);
     }
@@ -233,7 +225,6 @@ context(test_storage_utils) {
     it("maneja array vacío correctamente") {
       create_test_superblock(TEST_MOUNT_POINT);
 
-      // Crear bitmap inicial
       char bitmap_path[PATH_MAX];
       snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
                TEST_MOUNT_POINT);
@@ -246,7 +237,7 @@ context(test_storage_utils) {
       fclose(bitmap_file);
 
       // Llamar con count = 0
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, NULL, 0, 1);
+      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 0, 0, 1);
 
       should_int(result) be equal to(0);
 

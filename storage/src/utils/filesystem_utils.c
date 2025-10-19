@@ -1,20 +1,94 @@
-#include "storage_utils.h"
-#include "globals/globals.h"
+#include "filesystem_utils.h"
+#include "../errors.h"
+#include "../globals/globals.h"
 #include <commons/bitarray.h>
-#include <commons/string.h>
+#include <commons/config.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <utils/logger.h>
 
-/**
- * Lee el archivo superblock.config y obtiene la configuración del filesystem
- *
- * @param mount_point Path de la carpeta donde está montado el filesystem
- * @param fs_size Puntero donde se almacenará el tamaño del filesystem
- * @param block_size Puntero donde se almacenará el tamaño de los bloques
- * @return 0 en caso de éxito, -1 si no puede abrir el archivo, -2 si faltan
- * propiedades
- */
+int create_dir_recursive(const char *path) {
+  char command[PATH_MAX + 20];
+  snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
+
+  if (system(command) != 0) {
+    log_error(g_storage_logger, "No se pudo crear la carpeta %s", path);
+    return -1;
+  }
+  return 0;
+}
+
+int create_file_dir_structure(const char *mount_point, const char *file_name,
+                              const char *tag) {
+  char target_path[PATH_MAX];
+  struct stat st;
+
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
+           file_name, tag);
+  if (stat(target_path, &st) == 0) {
+    log_error(g_storage_logger,
+              "El tag %s ya existe para el archivo %s, reportando "
+              "FILE_TAG_ALREADY_EXISTS",
+              tag, file_name);
+    return FILE_TAG_ALREADY_EXISTS;
+  }
+
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s/logical_blocks",
+           mount_point, file_name, tag);
+
+  return create_dir_recursive(target_path);
+}
+
+int delete_file_dir_structure(const char *mount_point, const char *file_name,
+                              const char *tag) {
+  char target_path[PATH_MAX];
+  struct stat st;
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
+           file_name, tag);
+
+  if (stat(target_path, &st) != 0) {
+    log_warning(g_storage_logger,
+                "La carpeta %s no existe, reportando FILE_TAG_MISSING",
+                target_path);
+    return FILE_TAG_MISSING;
+  }
+
+  char command[PATH_MAX + 20];
+  snprintf(command, sizeof(command), "rm -rf \"%s\"", target_path);
+  if (system(command) != 0) {
+    log_error(g_storage_logger, "No se pudo eliminar la carpeta %s",
+              target_path);
+    return -1;
+  }
+
+  return 0;
+}
+
+int create_metadata_file(const char *mount_point, const char *file_name,
+                         const char *tag, const char *initial_content) {
+  char metadata_path[PATH_MAX];
+
+  snprintf(metadata_path, sizeof(metadata_path),
+           "%s/files/%s/%s/metadata.config", mount_point, file_name, tag);
+
+  FILE *metadata_ptr = fopen(metadata_path, "w");
+  if (metadata_ptr == NULL) {
+    log_error(g_storage_logger, "No se pudo crear el archivo %s",
+              metadata_path);
+    return -1;
+  }
+
+  const char *content = initial_content
+                            ? initial_content
+                            : "SIZE=0\nBLOCKS=[]\nESTADO=WORK_IN_PROGRESS\n";
+  fprintf(metadata_ptr, "%s", content);
+  fclose(metadata_ptr);
+
+  return 0;
+}
+
 int read_superblock(const char *mount_point, int *fs_size, int *block_size) {
   char superblock_path[PATH_MAX];
   snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config",
@@ -45,12 +119,6 @@ int read_superblock(const char *mount_point, int *fs_size, int *block_size) {
   return 0;
 }
 
-/**
- * Calcula el tamaño en bytes necesario para el bitmap del filesystem
- *
- * @param mount_point Path de la carpeta donde está montado el filesystem
- * @return Tamaño en bytes del bitmap, -1 si hay error
- */
 size_t get_bitmap_size_bytes(const char *mount_point) {
   int fs_size, block_size;
 
@@ -65,25 +133,13 @@ size_t get_bitmap_size_bytes(const char *mount_point) {
   return bitmap_size_bytes;
 }
 
-/**
- * Modifica múltiples bits en el bitmap del filesystem
- *
- * @param mount_point Path de la carpeta donde está montado el filesystem
- * @param indexes Array de índices de bloques a modificar
- * @param count Cantidad de elementos en el array indexes
- * @param set_bits 1 para setear bits (marcar como ocupados), 0 para unsetear
- * (marcar como libres)
- * @return 0 en caso de éxito, -1 si hay error abriendo bitmap, -2 si hay error
- * de memoria, -3 si hay error escribiendo
- */
-int modify_bitmap_bits(const char *mount_point, int *indexes, size_t count,
+int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
                        int set_bits) {
   int retval = 0;
   FILE *bitmap_file = NULL;
   char *bitmap_buffer = NULL;
   t_bitarray *bitmap = NULL;
 
-  // Obtener el tamaño del bitmap
   size_t bitmap_size_bytes = get_bitmap_size_bytes(mount_point);
   if (bitmap_size_bytes == (size_t)-1) {
     log_error(g_storage_logger, "No se pudo calcular el tamaño del bitmap");
@@ -91,7 +147,6 @@ int modify_bitmap_bits(const char *mount_point, int *indexes, size_t count,
     goto end;
   }
 
-  // Abrir el archivo bitmap
   char bitmap_path[PATH_MAX];
   snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin", mount_point);
 
@@ -103,7 +158,6 @@ int modify_bitmap_bits(const char *mount_point, int *indexes, size_t count,
     goto end;
   }
 
-  // Leer el bitmap existente
   bitmap_buffer = calloc(1, bitmap_size_bytes);
   if (!bitmap_buffer) {
     log_error(g_storage_logger, "No se pudo asignar memoria para el bitmap");
@@ -126,12 +180,11 @@ int modify_bitmap_bits(const char *mount_point, int *indexes, size_t count,
     goto clean_buffer;
   }
 
-  // Modificar los bits según el parámetro set_bits
   for (size_t i = 0; i < count; i++) {
     if (set_bits) {
-      bitarray_set_bit(bitmap, indexes[i]);
+      bitarray_set_bit(bitmap, start_index + i);
     } else {
-      bitarray_clean_bit(bitmap, indexes[i]);
+      bitarray_clean_bit(bitmap, start_index + i);
     }
   }
 

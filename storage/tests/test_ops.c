@@ -1,14 +1,23 @@
+#include "../src/errors.h"
 #include "../src/fresh_start/fresh_start.h"
 #include "../src/globals/globals.h"
-#include "../src/ops.h"
-#include "../src/storage_utils.h"
+#include "../src/operations/create_file.h"
+#include "../src/utils/filesystem_utils.h"
 #include "test_utils.h"
 #include <cspecs/cspec.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+// Declaraciones para funciones static que testeamos
+int truncate_file(uint32_t query_id, const char *name, const char *tag,
+                  int new_size_bytes, const char *mount_point);
+int maybe_handle_orphaned_physical_block(const char *physical_block_path,
+                                         const char *mount_point,
+                                         uint32_t query_id);
 
 context(test_ops) {
   describe("create_file op") {
@@ -17,6 +26,7 @@ context(test_ops) {
     before {
       create_test_directory();
       test_logger = create_test_logger();
+      g_storage_logger = test_logger;
 
       // Crear estructura básica del filesystem para las pruebas
       char files_dir[PATH_MAX];
@@ -32,8 +42,7 @@ context(test_ops) {
     end
 
     it("crea archivo nuevo con tag correctamente") {
-      int result =
-          create_file("test_file", "v1", TEST_MOUNT_POINT, test_logger);
+      int result = _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
 
       should_int(result) be equal to(0);
 
@@ -71,20 +80,18 @@ context(test_ops) {
     end
 
     it("retorna error si ya existe la carpeta del archivo con el mismo tag") {
-      create_file("existing_file", "existing_tag", TEST_MOUNT_POINT,
-                  test_logger);
+      _create_file(2, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
-      int result = create_file("existing_file", "existing_tag",
-                               TEST_MOUNT_POINT, test_logger);
+      int result =
+          _create_file(3, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
-      should_int(result) be equal to(-1);
+      should_int(result) be equal to(FILE_TAG_ALREADY_EXISTS);
     }
     end
 
     it("crea multiples tags para el mismo archivo") {
-      create_file("multi_tag_file", "tag1", TEST_MOUNT_POINT, test_logger);
-      int result =
-          create_file("multi_tag_file", "tag2", TEST_MOUNT_POINT, test_logger);
+      _create_file(4, "multi_tag_file", "tag1", TEST_MOUNT_POINT);
+      int result = _create_file(5, "multi_tag_file", "tag2", TEST_MOUNT_POINT);
 
       should_int(result) be equal to(0);
 
@@ -123,8 +130,7 @@ context(test_ops) {
     end
 
     it("trunca archivo reduciendo el tamaño correctamente") {
-      // Crear archivo de prueba
-      create_file("test_truncate", "v1", TEST_MOUNT_POINT, test_logger);
+      _create_file(6, "test_truncate", "v1", TEST_MOUNT_POINT);
 
       // Simular archivo con 3 bloques
       char metadata_path[PATH_MAX];
@@ -135,8 +141,8 @@ context(test_ops) {
       fclose(metadata);
 
       // Truncar a 2 bloques (256 bytes)
-      int result = truncate_file("test_truncate", "v1", 256, TEST_MOUNT_POINT,
-                                 test_logger);
+      int result =
+          truncate_file(7, "test_truncate", "v1", 256, TEST_MOUNT_POINT);
 
       should_int(result) be equal to(0);
 
@@ -151,7 +157,7 @@ context(test_ops) {
 
     it("expande archivo creando nuevos bloques correctamente") {
       // Crear archivo de prueba con 1 bloque
-      create_file("test_expand", "v1", TEST_MOUNT_POINT, test_logger);
+      _create_file(8, "test_expand", "v1", TEST_MOUNT_POINT);
 
       char metadata_path[PATH_MAX];
       snprintf(metadata_path, sizeof(metadata_path),
@@ -161,8 +167,7 @@ context(test_ops) {
       fclose(metadata);
 
       // Expandir a 3 bloques (384 bytes)
-      int result = truncate_file("test_expand", "v1", 384, TEST_MOUNT_POINT,
-                                 test_logger);
+      int result = truncate_file(9, "test_expand", "v1", 384, TEST_MOUNT_POINT);
 
       should_int(result) be equal to(0);
 
@@ -176,16 +181,15 @@ context(test_ops) {
     end
 
     it("retorna error para archivo inexistente") {
-      int result = truncate_file("nonexistent", "v1", 256, TEST_MOUNT_POINT,
-                                 test_logger);
+      int result =
+          truncate_file(10, "nonexistent", "v1", 256, TEST_MOUNT_POINT);
 
       should_int(result) be equal to(-2);
     }
     end
 
     it("retorna error si no puede abrir superblock config") {
-      int result =
-          truncate_file("test", "v1", 256, "/invalid/path", test_logger);
+      int result = truncate_file(11, "test", "v1", 256, "/invalid/path");
 
       should_int(result) be equal to(-1);
     }
@@ -194,7 +198,7 @@ context(test_ops) {
     it("no modifica nada si el nuevo tamaño encaja en la misma cantidad de "
        "bloques") {
       // Crear archivo de prueba
-      create_file("test_same_blocks", "v1", TEST_MOUNT_POINT, test_logger);
+      _create_file(12, "test_same_blocks", "v1", TEST_MOUNT_POINT);
 
       char metadata_path[PATH_MAX];
       snprintf(metadata_path, sizeof(metadata_path),
@@ -205,12 +209,11 @@ context(test_ops) {
       fclose(metadata);
 
       // Cambiar a un tamaño que sigue necesitando 2 bloques
-      int result = truncate_file("test_same_blocks", "v1", 250,
-                                 TEST_MOUNT_POINT, test_logger);
+      int result =
+          truncate_file(13, "test_same_blocks", "v1", 250, TEST_MOUNT_POINT);
 
       should_int(result) be equal to(0);
 
-      // El resultado debería ser que no se modificó nada
       char metadata_content[256];
       read_file_contents(metadata_path, metadata_content,
                          sizeof(metadata_content));
@@ -220,7 +223,7 @@ context(test_ops) {
   }
   end
 
-    describe("maybe_handle_orphaned_physical_block op") {
+    describe("maybe_handle_orphaned_physical_block") {
     t_log *test_logger;
 
     before {
@@ -228,7 +231,6 @@ context(test_ops) {
       test_logger = create_test_logger();
       g_storage_logger = test_logger;
 
-      // Crear estructura básica del filesystem
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
     }
@@ -250,13 +252,13 @@ context(test_ops) {
       fprintf(block_file, "test data");
       fclose(block_file);
 
-      // Setear el bit en el bitmap (simular que está ocupado)
+      // Setear el bit en el bitmap
       int block_index = 1;
-      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, &block_index, 1, 1);
+      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, block_index, 1, 1);
       should_int(result_set) be equal to(0);
 
-      int result = maybe_handle_orphaned_physical_block(
-          physical_block_path, TEST_MOUNT_POINT, 123, test_logger);
+      int result = maybe_handle_orphaned_physical_block(physical_block_path,
+                                                        TEST_MOUNT_POINT, 123);
 
       should_int(result) be equal to(0);
 
@@ -279,7 +281,6 @@ context(test_ops) {
     end
 
     it("no libera bloque con hard links") {
-      // Crear un bloque físico de prueba con hard link
       char physical_block_path[PATH_MAX];
       char hard_link_path[PATH_MAX];
       snprintf(physical_block_path, sizeof(physical_block_path),
@@ -296,12 +297,11 @@ context(test_ops) {
 
       // Setear el bit en el bitmap
       int block_index = 2;
-      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, &block_index, 1, 1);
+      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, block_index, 1, 1);
       should_int(result_set) be equal to(0);
 
-      // Llamar a la función
-      int result = maybe_handle_orphaned_physical_block(
-          physical_block_path, TEST_MOUNT_POINT, 456, test_logger);
+      int result = maybe_handle_orphaned_physical_block(physical_block_path,
+                                                        TEST_MOUNT_POINT, 456);
 
       should_int(result) be equal to(0);
 
@@ -329,8 +329,8 @@ context(test_ops) {
       snprintf(nonexistent_path, sizeof(nonexistent_path),
                "%s/physical_blocks/block9999.dat", TEST_MOUNT_POINT);
 
-      int result = maybe_handle_orphaned_physical_block(
-          nonexistent_path, TEST_MOUNT_POINT, 789, test_logger);
+      int result = maybe_handle_orphaned_physical_block(nonexistent_path,
+                                                        TEST_MOUNT_POINT, 789);
 
       should_int(result) be equal to(-1);
     }
@@ -345,8 +345,8 @@ context(test_ops) {
       fprintf(block_file, "test data");
       fclose(block_file);
 
-      int result = maybe_handle_orphaned_physical_block(
-          invalid_path, TEST_MOUNT_POINT, 101, test_logger);
+      int result = maybe_handle_orphaned_physical_block(invalid_path,
+                                                        TEST_MOUNT_POINT, 101);
 
       should_int(result) be equal to(-2);
     }
@@ -361,8 +361,8 @@ context(test_ops) {
       fprintf(block_file, "test data");
       fclose(block_file);
 
-      int result = maybe_handle_orphaned_physical_block(
-          physical_block_path, "/invalid/mount", 202, test_logger);
+      int result = maybe_handle_orphaned_physical_block(physical_block_path,
+                                                        "/invalid/mount", 202);
 
       should_int(result) be equal to(-3);
     }

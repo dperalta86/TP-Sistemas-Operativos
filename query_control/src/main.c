@@ -13,11 +13,15 @@
 
 #define MODULO "QUERY_CONTROL"
 
+// Abstraccion de manejo de errores
+static inline int fail_pkg(t_log* logger, const char* msg, t_package** pkgr, int code) {
+    if (logger && msg) log_error(logger, "%s", msg);
+    if (pkgr && *pkgr) { package_destroy(*pkgr); *pkgr = NULL; }
+    return code;
+}
+
 int main(int argc, char* argv[])
 {
-    char* config_filepath = argv[1];
-    char* query_filepath = argv[2];
-    int priority = atoi(argv[3]);
     int retval = 0;
 
     if (argc != 4) {
@@ -25,6 +29,11 @@ int main(int argc, char* argv[])
         retval = -1;
         goto error;
     }
+
+    char* config_filepath = argv[1];
+    char* query_filepath = argv[2];
+    int priority = atoi(argv[3]);
+
 
     if (priority < 0) {
         printf("[ERROR]: La prioridad no puede ser negativa\n");
@@ -76,16 +85,19 @@ int main(int argc, char* argv[])
     if (package_handshake == NULL) 
     {
         log_error(logger, "Error al crear el paquete para el handshake al master");
+        retval = -6;
         goto clean_socket;
     }
 
-    // agrego un string como campo del buffer
-    package_add_string(package_handshake, "QUERY_CONTROL_HANDSHAKE");
+    // agrego un string como campo del buffer y verifico Éxito
+    if (!package_add_string(package_handshake, "QUERY_CONTROL_HANDSHAKE")) {
+        retval = fail_pkg(logger, "Error al agregar string al paquete handshake", &package_handshake, -6);
+        goto clean_socket;
+    }
 
-    // Envio el paquete
-    if (package_send(package_handshake, master_socket) != 0)
-    {
-        log_error(logger, "Error al enviar el paquete para handshake al master");
+    // Envio del paquete
+    if (package_send(package_handshake, master_socket) != 0) {
+        retval = fail_pkg(logger, "Error al enviar el paquete handshake al master", &package_handshake, -6);
         goto clean_socket;
     }
 
@@ -95,9 +107,12 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     t_package *response_package = package_receive(master_socket);
 
-    if (!response_package || response_package->operation_code != OP_QUERY_HANDSHAKE)
-    {
-        log_error(logger, "Error al recibir respuesta al handshake con Master!");
+    if (!response_package) {
+        retval = fail_pkg(logger, "Error al recibir respuesta de handshake", &response_package, -6);
+        goto clean_socket;
+    }
+    if (response_package->operation_code != OP_QUERY_HANDSHAKE) {
+        retval = fail_pkg(logger, "Handshake inválido (opcode inesperado)", &response_package, -6);
         goto clean_socket;
     }
 
@@ -109,28 +124,113 @@ int main(int argc, char* argv[])
     log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %d", query_filepath, priority);
 
     t_package* package_to_send = package_create_empty(OP_QUERY_FILE_PATH);
-    package_add_string(package_to_send, query_filepath);
-    package_add_uint8(package_to_send, (uint8_t)priority);
-
-    int connection_code = package_send(package_to_send, master_socket);
-    if (connection_code < 0)
-    {
+    if (!package_to_send) {
+        log_error(logger, "Error al crear el paquete para envío de Query");
+        retval = -6;
         goto clean_socket;
     }
 
-    // Preparo para recibir respuesta
-    response_package = package_receive(master_socket); // --> Reutilzó response package
-
-    if (response_package->operation_code != OP_QUERY_FILE_PATH)
-    {
-        log_error(logger, "Error al recibir respuesta..."); 
+    // Ejecutar y validar ambos package_add
+    if (!package_add_string(package_to_send, query_filepath)) {
+        retval = fail_pkg(logger, "Error al agregar path de Query al paquete", &package_to_send, -6);
+        goto clean_socket;
     }
+    if (!package_add_uint8(package_to_send, (uint8_t)priority)) {
+        retval = fail_pkg(logger, "Error al agregar prioridad al paquete", &package_to_send, -6);
+        goto clean_socket;
+    }
+
+    if (package_send(package_to_send, master_socket) < 0) {
+        retval = fail_pkg(logger, "Error al enviar paquete con Query al Master", &package_to_send, -6);
+        goto clean_socket;  
+    }
+
+    package_destroy(package_to_send);
+
+
+    // Preparo para recibir respuesta
+    response_package = package_receive(master_socket); 
+    
+    if (!response_package || response_package->operation_code != QC_OP_MASTER_CONNECTION_OK)
+    {
+        retval = fail_pkg(logger, "Error al recibir respuesta de conexión de Master", &response_package, -7); 
+    }
+
     log_info(logger, "Paquete con path de query: %s y prioridad: %d enviado al master correctamente", query_filepath, priority);
 
 
-    // TODO: Manejar la respuesta
+    // === Loop de recepción: READ / FIN ===
+    while (true) {
+    t_package *resp = package_receive(master_socket);
 
-    package_destroy(package_to_send);
+    if (!resp) {
+        log_error(logger, "Conexión con Master cerrada inesperadamente");
+        retval = -7;
+        break;
+    }
+
+    switch (resp->operation_code) {
+
+        case QC_OP_READ_DATA: {
+
+            char* file_tag = package_read_string(resp);  
+            size_t size = 0; 
+            void* file_data = package_read_data(resp, &size);
+
+            if(file_tag == NULL){
+                retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
+                goto clean_socket;
+
+            }
+            else if(file_data == NULL){
+                 retval = fail_pkg(logger, "", &resp, -7); 
+                 log_error(logger, "No se leyo ningun dato del archivo %s", file_tag);  
+                 free(file_tag); 
+                 goto clean_socket;             
+            } 
+
+
+            char* contenido = malloc(size + 1);
+
+            if (!contenido) {
+                retval = fail_pkg(logger, "Memoria insuficiente al procesar READ_DATA", &resp, -7);
+                free(file_tag); free(file_data);
+                goto clean_socket;
+            }
+            memcpy(contenido, file_data, size);
+            contenido[size] = '\0';
+
+            // Estructura <File:Tag> debe venir de master en un solo string listo para logear
+            log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
+
+            free(file_tag);
+            free(file_data);
+            free(contenido);
+        } break;
+
+        case QC_OP_MASTER_FIN_DESCONEXION:
+        case QC_OP_MASTER_FIN_PRIORIDAD: {
+
+
+            const char* motivoString =
+            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
+
+            log_info(logger, "## Query Finalizada - %s", motivoString);
+
+            package_destroy(resp); resp = NULL;
+            retval = 0;
+            goto clean_socket;
+        } break;
+        
+        default:
+            log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);
+            retval = fail_pkg(logger, "", &resp, -7);
+            break;
+    }
+
+    package_destroy(resp);
+}
+
     package_destroy(response_package);
 
 clean_socket:
@@ -141,4 +241,8 @@ clean_config:
     destroy_query_control_config_instance(query_control_config);
 error:
     return retval;
+
+
+
 }
+

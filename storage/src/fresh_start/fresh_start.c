@@ -1,5 +1,5 @@
 #include "fresh_start.h"
-#include "../storage_utils.h"
+#include "../utils/filesystem_utils.h"
 
 /**
  * Borra todo el contenido del directorio de montaje excepto superblock.config
@@ -37,7 +37,7 @@ int wipe_storage_content(const char *mount_point) {
 /**
  * Crea el bitmap que dice qué bloques están libres o ocupados
  *
- * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param mount_point Ruta del directorio donde está montado el filesystem
  * @param fs_size Tamaño total del filesystem
  * @param block_size Tamaño de cada bloque
  * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si no hay
@@ -49,19 +49,17 @@ int init_bitmap(const char *mount_point, int fs_size, int block_size) {
   // Checkear si el mount point existe
   struct stat st;
   if (stat(mount_point, &st) != 0 || !S_ISDIR(st.st_mode)) {
-    log_error(g_storage_logger, "La carpeta %s no existe o no es una carpeta",
-              mount_point);
+    log_error(g_storage_logger,
+              "El directorio %s no existe o no es un directorio", mount_point);
     return -1;
   }
 
   char bitmap_path[PATH_MAX];
   snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin", mount_point);
 
-  size_t bitmap_size_bytes = get_bitmap_size_bytes(mount_point);
-  if (bitmap_size_bytes == (size_t)-1) {
-    log_error(g_storage_logger, "No se pudo calcular el tamaño del bitmap");
-    return -1;
-  }
+  int total_blocks = fs_size / block_size;
+  size_t bitmap_size_bytes =
+      (total_blocks + 7) / 8; // Redondear al próximo byte
 
   // Setear todo el buffer a cero (todos los bloques libres)
   char *zero_buffer = calloc(1, bitmap_size_bytes);
@@ -89,7 +87,8 @@ int init_bitmap(const char *mount_point, int fs_size, int block_size) {
   }
 
   fwrite(zero_buffer, 1, bitmap_size_bytes, bitmap_file);
-  log_info(g_storage_logger, "Bitmap inicializado en %s", bitmap_path);
+  log_info(g_storage_logger, "Bitmap inicializado en %s con %d bloques",
+           bitmap_path, total_blocks);
 
   fclose(bitmap_file);
 clean_bitmap:
@@ -137,9 +136,7 @@ int init_physical_blocks(const char *mount_point, int fs_size, int block_size) {
   snprintf(physical_blocks_dir_path, sizeof(physical_blocks_dir_path),
            "%s/physical_blocks", mount_point);
 
-  if (mkdir(physical_blocks_dir_path, 0755) != 0) {
-    log_error(g_storage_logger, "No se pudo crear el directorio %s",
-              physical_blocks_dir_path);
+  if (create_dir_recursive(physical_blocks_dir_path) != 0) {
     return -1;
   }
 
@@ -189,34 +186,11 @@ int init_files(const char *mount_point) {
   char source_path[PATH_MAX];
   char target_path[PATH_MAX];
 
-  snprintf(target_path, PATH_MAX, "%s/files", mount_point);
-  if (mkdir(target_path, 0755) != 0) {
-    log_error(g_storage_logger, "No se pudo crear el directorio %s",
-              target_path);
+  // Crear estructura de carpetas para el archivo inicial
+  if (create_file_dir_structure(mount_point, "initial_file", "BASE") != 0) {
+    log_error(g_storage_logger,
+              "No se pudo crear la estructura de carpetas para initial_file");
     return -1;
-  }
-  log_info(g_storage_logger, "Directorio files creado en %s", target_path);
-
-  snprintf(target_path, PATH_MAX, "%s/files/initial_file", mount_point);
-  if (mkdir(target_path, 0755) != 0) {
-    log_error(g_storage_logger, "No se pudo crear el directorio %s",
-              target_path);
-    return -2;
-  }
-
-  snprintf(target_path, PATH_MAX, "%s/files/initial_file/BASE", mount_point);
-  if (mkdir(target_path, 0755) != 0) {
-    log_error(g_storage_logger, "No se pudo crear el directorio %s",
-              target_path);
-    return -3;
-  }
-
-  snprintf(target_path, PATH_MAX, "%s/files/initial_file/BASE/logical_blocks",
-           mount_point);
-  if (mkdir(target_path, 0755) != 0) {
-    log_error(g_storage_logger, "No se pudo crear el directorio %s",
-              target_path);
-    return -4;
   }
 
   snprintf(source_path, PATH_MAX, "%s/physical_blocks/block0000.dat",
@@ -230,18 +204,12 @@ int init_files(const char *mount_point) {
     return -5;
   }
 
-  snprintf(target_path, PATH_MAX, "%s/files/initial_file/BASE/metadata.config",
-           mount_point);
-  FILE *metadata_ptr = fopen(target_path, "w");
-  if (metadata_ptr == NULL) {
-    log_error(g_storage_logger, "No se pudo crear el archivo %s", target_path);
+  if (create_metadata_file(mount_point, "initial_file", "BASE",
+                           "SIZE=0\nBLOCKS=[0]\nESTADO=COMMITTED\n") != 0) {
     return -6;
   }
 
-  fprintf(metadata_ptr, "SIZE=0\nBLOCKS=[0]\nESTADO=COMMITTED\n");
-  log_info(g_storage_logger, "Archivo inicial creado en %s", target_path);
-
-  fclose(metadata_ptr);
+  log_info(g_storage_logger, "Archivo inicial creado");
 
   return 0;
 }
