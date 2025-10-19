@@ -63,6 +63,10 @@ all: debug
 .PHONY: debug
 debug: CFLAGS = $(CDEBUG)
 debug: $(OUT)
+debug:
+	@if command -v bear >/dev/null 2>&1; then \
+		bear -- $(MAKE) $(OUT) CFLAGS="$(CDEBUG)"; \
+	fi
 
 .PHONY: release
 release: CFLAGS = $(CRELEASE)
@@ -71,6 +75,10 @@ release: $(OUT)
 .PHONY: test
 test: CFLAGS = $(CDEBUG)
 test: $(TEST)
+test:
+	@if command -v bear >/dev/null 2>&1; then \
+		bear -- $(MAKE) $(TEST) CFLAGS="$(CDEBUG)"; \
+	fi
 
 .PHONY: clean
 clean:

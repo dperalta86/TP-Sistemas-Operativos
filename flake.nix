@@ -57,6 +57,7 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            bear
             gcc
             gdb
             gnumake
