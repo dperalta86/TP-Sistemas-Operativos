@@ -12,73 +12,60 @@
 #include <utils/logger.h>
 #include <utils/utils.h>
 
-int maybe_handle_orphaned_physical_block(const char *physical_block_path,
-                                         const char *mount_point,
-                                         uint32_t query_id) {
-  struct stat statbuf;
+int delete_logical_block(const char *mount_point, const char *name,
+                         const char *tag, int logical_block_index,
+                         int physical_block_index, uint32_t query_id) {
+  char target_path[PATH_MAX];
+  snprintf(target_path, sizeof(target_path),
+           "%s/files/%s/%s/logical_blocks/%d.dat", mount_point, name, tag,
+           logical_block_index);
 
-  if (stat(physical_block_path, &statbuf) != 0) {
-    log_error(g_storage_logger,
-              "No se pudo obtener el estado del bloque físico %s",
-              physical_block_path);
+  if (remove(target_path) != 0) {
+    log_error(g_storage_logger, "No se pudo eliminar el bloque lógico %d en %s",
+              logical_block_index, target_path);
     return -1;
   }
 
-  if (statbuf.st_nlink > 1) {
-    log_info(g_storage_logger,
-             "El bloque físico %s todavía tiene %lu hard links, no se libera",
-             physical_block_path, statbuf.st_nlink);
-    return 0;
-  }
+  log_info(g_storage_logger,
+           "##%u - Bloque Lógico Eliminado - Nombre: %s, Tag: %s, "
+           "Índice: %d",
+           query_id, name, tag, logical_block_index);
 
-  const char *filename = strrchr(physical_block_path, '/');
-  if (filename == NULL) {
-    filename =
-        physical_block_path; // Si no hay '/' el path completo es el filename
-  } else {
-    filename++; // Saltea el '/'
-  }
+  snprintf(target_path, sizeof(target_path), "%s/physical_blocks/block%04d.dat",
+           mount_point, physical_block_index);
 
-  // Validar que el nombre del archivo siga el formato "blockXXXX.dat"
-  int block_number;
-  if (sscanf(filename, "block%d.dat", &block_number) != 1) {
-    log_error(g_storage_logger, "No se pudo parsear el número de bloque de %s",
-              physical_block_path);
+  struct stat statbuf;
+  if (stat(target_path, &statbuf) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo obtener el estado del bloque lógico %d en %s",
+              logical_block_index, target_path);
     return -2;
   }
 
-  // Unsetear el bit del bloque en el bitmap
-  int result = modify_bitmap_bits(mount_point, block_number, 1, 0);
-  if (result != 0) {
-    log_error(g_storage_logger, "No se pudo liberar el bloque %d en el bitmap",
-              block_number);
+  if (statbuf.st_nlink != 1) {
+    log_info(g_storage_logger,
+             "El bloque físico %s todavía tiene %lu hard links, no se libera",
+             target_path, statbuf.st_nlink);
+    return 0;
+  }
+
+  if (modify_bitmap_bits(mount_point, physical_block_index, 1, 0) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo liberar el bloque físico %d en el bitmap",
+              physical_block_index);
     return -3;
   }
 
   log_info(g_storage_logger,
            "##%u - Bloque Físico Liberado - Número de Bloque: %d", query_id,
-           block_number);
-  log_info(g_storage_logger, "Bloque físico %s liberado exitosamente",
-           physical_block_path);
+           physical_block_index);
+
   return 0;
 }
 
 int truncate_file(uint32_t query_id, const char *name, const char *tag,
                   int new_size_bytes, const char *mount_point) {
   int retval = 0;
-
-  char storage_config_path[PATH_MAX];
-  snprintf(storage_config_path, sizeof(storage_config_path),
-           "%s/superblock.config", mount_point);
-  t_config *superblock_config = config_create(storage_config_path);
-  if (!superblock_config) {
-    log_error(g_storage_logger, "No se pudo abrir el config: %s",
-              storage_config_path);
-    retval = -1;
-    goto end;
-  }
-
-  int block_size = config_get_int_value(superblock_config, "BLOCK_SIZE");
 
   char metadata_path[PATH_MAX];
   snprintf(metadata_path, sizeof(metadata_path),
@@ -87,14 +74,13 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
   if (!metadata_config) {
     log_error(g_storage_logger, "No se pudo abrir el config: %s",
               metadata_path);
-    retval = -2;
-    goto clean_superblock_config;
+    return -1;
   }
 
   char **old_blocks = config_get_array_value(metadata_config, "BLOCKS");
   int old_block_count = string_array_size(old_blocks);
-  int new_block_count =
-      (new_size_bytes + block_size - 1) / block_size; // Redondeo hacia arriba
+  int new_block_count = (new_size_bytes + g_storage_config->block_size - 1) /
+                        g_storage_config->block_size; // Redondeo hacia arriba
 
   if (new_block_count == old_block_count) {
     log_info(g_storage_logger,
@@ -105,13 +91,12 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
 
   char **new_blocks = string_array_new();
   char target_path[PATH_MAX];
-  char resolved_path[PATH_MAX];
 
   if (new_block_count < old_block_count) {
     // Truncar (liberar bloques sobrantes)
     for (int i = new_block_count; i < old_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
-               "%s/files/%s/%s/logical_blocks/%d.bin", mount_point, name, tag,
+               "%s/files/%s/%s/logical_blocks/%d.dat", mount_point, name, tag,
                i);
 
       if (access(target_path, F_OK) != 0) {
@@ -120,23 +105,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
         continue;
       }
 
-      if (realpath(target_path, resolved_path) == NULL) {
-        log_error(g_storage_logger, "No se pudo resolver el path %s",
-                  target_path);
-        retval = -3;
-        goto clean_new_blocks;
-      }
-
-      if (remove(target_path) != 0) {
-        log_error(g_storage_logger,
-                  "No se pudo eliminar el bloque lógico %d en %s", i,
-                  target_path);
-        retval = -3;
-        goto clean_new_blocks;
-      }
-
-      maybe_handle_orphaned_physical_block(resolved_path, mount_point,
-                                           query_id);
+      delete_logical_block(mount_point, name, tag, i, atoi(old_blocks[i]), query_id);
     }
 
     for (int i = 0; i < new_block_count; i++) {
@@ -150,12 +119,12 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
 
     for (int i = old_block_count; i < new_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
-               "%s/files/%s/%s/logical_blocks/%d.bin", mount_point, name, tag,
+               "%s/files/%s/%s/logical_blocks/%d.dat", mount_point, name, tag,
                i);
       if (link(physical_block_zero_path, target_path) != 0) {
         log_error(g_storage_logger, "No se pudo crear hard link de %s a %s",
                   physical_block_zero_path, target_path);
-        retval = -4;
+        retval = -2;
         goto clean_new_blocks;
       }
     }
@@ -186,9 +155,6 @@ clean_new_blocks:
     string_array_destroy(new_blocks);
 clean_metadata_config:
   config_destroy(metadata_config);
-clean_superblock_config:
-  config_destroy(superblock_config);
-end:
   return retval;
 }
 
@@ -203,18 +169,18 @@ t_package *handle_truncate_file_op_package(t_package *package) {
   char *name = package_read_string(package);
   char *tag = package_read_string(package);
 
-  uint32_t new_size_bytes;
-  if (!package_read_uint32(package, &new_size_bytes)) {
+  if (!name || !tag) {
     log_error(g_storage_logger,
-              "## Error al deserializar new_size_bytes de TRUNCATE_FILE");
+              "## Error al deserializar parámetros de TRUNCATE_FILE");
     free(name);
     free(tag);
     return NULL;
   }
 
-  if (!name || !tag) {
+  uint32_t new_size_bytes;
+  if (!package_read_uint32(package, &new_size_bytes)) {
     log_error(g_storage_logger,
-              "## Error al deserializar parámetros de TRUNCATE_FILE");
+              "## Error al deserializar new_size_bytes de TRUNCATE_FILE");
     free(name);
     free(tag);
     return NULL;

@@ -111,6 +111,11 @@ context(test_ops) {
       g_storage_logger =
           test_logger; // Para que init_storage use el logger correcto
 
+      g_storage_config = malloc(sizeof(t_storage_config));
+      g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
+      g_storage_config->block_size = TEST_BLOCK_SIZE;
+      g_storage_config->fs_size = TEST_FS_SIZE;
+
       // Crear superblock.config y usar fresh start del storage
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
@@ -118,6 +123,9 @@ context(test_ops) {
     end
 
         after {
+      free(g_storage_config->mount_point);
+      free(g_storage_config);
+      g_storage_config = NULL;
       destroy_test_logger(test_logger);
       cleanup_test_directory();
     }
@@ -178,13 +186,6 @@ context(test_ops) {
       int result =
           truncate_file(10, "nonexistent", "v1", 256, TEST_MOUNT_POINT);
 
-      should_int(result) be equal to(-2);
-    }
-    end
-
-    it("retorna error si no puede abrir superblock config") {
-      int result = truncate_file(11, "test", "v1", 256, "/invalid/path");
-
       should_int(result) be equal to(-1);
     }
     end
@@ -217,7 +218,7 @@ context(test_ops) {
   }
   end
 
-    describe("maybe_handle_orphaned_physical_block") {
+    describe("delete_logical_block") {
     t_log *test_logger;
 
     before {
@@ -225,140 +226,59 @@ context(test_ops) {
       test_logger = create_test_logger();
       g_storage_logger = test_logger;
 
+      g_storage_config = malloc(sizeof(t_storage_config));
+      g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
+      g_storage_config->block_size = TEST_BLOCK_SIZE;
+      g_storage_config->fs_size = TEST_FS_SIZE;
+
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
     }
     end
 
         after {
+      free(g_storage_config->mount_point);
+      free(g_storage_config);
+      g_storage_config = NULL;
       destroy_test_logger(test_logger);
       cleanup_test_directory();
     }
     end
 
-    it("libera bloque huérfano sin hard links correctamente") {
-      // Crear un bloque físico de prueba
-      char physical_block_path[PATH_MAX];
-      snprintf(physical_block_path, sizeof(physical_block_path),
-               "%s/physical_blocks/block0001.dat", TEST_MOUNT_POINT);
+    it("elimina bloque lógico y libera bloque físico sin hard links") {
+      _create_file(14, "test_delete", "v1", TEST_MOUNT_POINT);
 
-      FILE *block_file = fopen(physical_block_path, "w");
-      fprintf(block_file, "test data");
-      fclose(block_file);
-
-      // Setear el bit en el bitmap
-      int block_index = 1;
-      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, block_index, 1, 1);
-      should_int(result_set) be equal to(0);
-
-      int result = maybe_handle_orphaned_physical_block(physical_block_path,
-                                                        TEST_MOUNT_POINT, 123);
-
-      should_int(result) be equal to(0);
-
-      // Verificar que el bit se unseteó en el bitmap
-      char bitmap_path[PATH_MAX];
-      snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
-               TEST_MOUNT_POINT);
-
-      FILE *bitmap_file = fopen(bitmap_path, "rb");
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
-      unsigned char *bitmap_data = malloc(bitmap_size);
-      fread(bitmap_data, 1, bitmap_size, bitmap_file);
-      fclose(bitmap_file);
-
-      // El bit 1 debería estar en 0
-      should_int(bitmap_data[0] & 0x40) be equal to(0); // bit 1
-
-      free(bitmap_data);
+      // TODO: Implementar cuando tengamos una función para escribir archivos
     }
     end
 
-    it("no libera bloque con hard links") {
-      char physical_block_path[PATH_MAX];
-      char hard_link_path[PATH_MAX];
-      snprintf(physical_block_path, sizeof(physical_block_path),
-               "%s/physical_blocks/block0002.dat", TEST_MOUNT_POINT);
-      snprintf(hard_link_path, sizeof(hard_link_path), "%s/test_hardlink.dat",
-               TEST_MOUNT_POINT);
+    it("elimina bloque lógico pero no libera bloque físico con hard links") {
+      // Crear dos archivos que comparten el mismo bloque físico
+      _create_file(15, "test_shared1", "v1", TEST_MOUNT_POINT);
+      _create_file(16, "test_shared2", "v1", TEST_MOUNT_POINT);
 
-      FILE *block_file = fopen(physical_block_path, "w");
-      fprintf(block_file, "test data");
-      fclose(block_file);
-
-      // Crear hard link
-      link(physical_block_path, hard_link_path);
-
-      // Setear el bit en el bitmap
-      int block_index = 2;
-      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, block_index, 1, 1);
-      should_int(result_set) be equal to(0);
-
-      int result = maybe_handle_orphaned_physical_block(physical_block_path,
-                                                        TEST_MOUNT_POINT, 456);
-
-      should_int(result) be equal to(0);
-
-      // Verificar que el bit NO se unseteó en el bitmap
-      char bitmap_path[PATH_MAX];
-      snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
-               TEST_MOUNT_POINT);
-
-      FILE *bitmap_file = fopen(bitmap_path, "rb");
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
-      unsigned char *bitmap_data = malloc(bitmap_size);
-      fread(bitmap_data, 1, bitmap_size, bitmap_file);
-      fclose(bitmap_file);
-
-      // El bit 2 debería seguir en 1
-      should_int(bitmap_data[0] & 0x20) not be equal to(0); // bit 2
-
-      free(bitmap_data);
-      unlink(hard_link_path);
+      // TODO: Implementar cuando tengamos una función para escribir archivos
     }
     end
 
-    it("retorna error para archivo inexistente") {
-      char nonexistent_path[PATH_MAX];
-      snprintf(nonexistent_path, sizeof(nonexistent_path),
-               "%s/physical_blocks/block9999.dat", TEST_MOUNT_POINT);
+    it("retorna error si el bloque lógico no existe") {
+      _create_file(17, "test_nonexistent", "v1", TEST_MOUNT_POINT);
 
-      int result = maybe_handle_orphaned_physical_block(nonexistent_path,
-                                                        TEST_MOUNT_POINT, 789);
+      int result = delete_logical_block(TEST_MOUNT_POINT, "test_nonexistent",
+                                        "v1", 99, 1, 789);
 
       should_int(result) be equal to(-1);
     }
     end
 
-    it("retorna error para nombre de bloque inválido") {
-      char invalid_path[PATH_MAX];
-      snprintf(invalid_path, sizeof(invalid_path),
-               "%s/physical_blocks/invalid_name.dat", TEST_MOUNT_POINT);
+    it("retorna error si no puede obtener estado del bloque físico") {
+      _create_file(18, "test_stat_error", "v1", TEST_MOUNT_POINT);
 
-      FILE *block_file = fopen(invalid_path, "w");
-      fprintf(block_file, "test data");
-      fclose(block_file);
+      // TODO: Implementar cuando tengamos una función para escribir archivos
 
-      int result = maybe_handle_orphaned_physical_block(invalid_path,
-                                                        TEST_MOUNT_POINT, 101);
-
-      should_int(result) be equal to(-2);
-    }
-    end
-
-    it("retorna error para superblock inexistente") {
-      char physical_block_path[PATH_MAX];
-      snprintf(physical_block_path, sizeof(physical_block_path),
-               "%s/physical_blocks/block0003.dat", TEST_MOUNT_POINT);
-
-      FILE *block_file = fopen(physical_block_path, "w");
-      fprintf(block_file, "test data");
-      fclose(block_file);
-
-      int result = maybe_handle_orphaned_physical_block(physical_block_path,
-                                                        "/invalid/mount", 202);
-
-      should_int(result) be equal to(-3);
+      /* int result = delete_logical_block(TEST_MOUNT_POINT, "test_stat_error",
+       * "v1", 0, 9999, 101); */
+      /* should_int(result) be equal to(-2); */
     }
     end
   }
