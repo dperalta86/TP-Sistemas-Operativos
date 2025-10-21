@@ -19,9 +19,9 @@
 typedef struct
 {
     char query_path[PATH_MAX];
+    int query_id;
     int program_counter;
     bool is_executing;
-    int query_id;
 } query_context_t;
 
 typedef struct
@@ -39,122 +39,184 @@ typedef struct
 } worker_state_t;
 
 void *query_executor_thread(void *arg);
+void *master_listener_thread(void *arg);
 
 int main(int argc, char *argv[])
 {
     if (argc != 3)
     {
         fprintf(stderr, "Se deben ingresar los argumentos [archivo_config] y [ID Worker]\n");
-        goto error;
+        exit(EXIT_FAILURE);
     }
 
-    char *config_file_path = argv[1];
+    char *config_path = argv[1];
     int worker_id = atoi(argv[2]);
-    char worker_id_str[12];
-    sprintf(worker_id_str, "%d", worker_id);
 
-    t_worker_config *worker_config = create_worker_config(config_file_path);
-    if (worker_config == NULL)
+    /* Cargar configuracion */
+    t_worker_config *config = create_worker_config(config_path);
+    if (!config)
     {
-        fprintf(stderr, "No se pudo cargar la configuración\n");
-        goto error;
+        fprintf(stderr, "Error al leer archivo de configuración\n");
+        exit(EXIT_FAILURE);
     }
 
-    t_log_level log_level = log_level_from_string(worker_config->log_level);
+    /* Crear instancia de logger */
+    t_log_level log_level = log_level_from_string(config->log_level);
     if (logger_init("worker", log_level, true) < 0)
     {
-        fprintf(stderr, "No se pudo inicializar el logger global\n");
-        goto clean;
+        fprintf(stderr, "Error al inicializar logger\n");
+        destroy_worker_config(config);
+        exit(EXIT_FAILURE);
     }
 
     t_log *logger = logger_get();
-    log_info(logger, "## Logger inicializado");
+    log_info(logger, "## Worker iniciado - ID=%d", worker_id);
 
-    int client_socket_master = handshake_with_master(
-        worker_config->master_ip,
-        worker_config->master_port,
-        worker_id_str);
+    /* Handshake con Storage y Master */
+    char worker_id_str[16];
+    sprintf(worker_id_str, "%d", worker_id);
 
-    if (client_socket_master < 0)
-    {
-        goto clean;
-    }
+    int socket_storage = handshake_with_storage(config->storage_ip, config->storage_port, worker_id_str);
+    if (socket_storage < 0)
+        goto cleanup;
 
-    int client_socket_storage = handshake_with_storage(
-        worker_config->storage_ip,
-        worker_config->storage_port,
-        worker_id_str);
+    int socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id_str);
+    if (socket_master < 0)
+        goto cleanup;
 
-    if (client_socket_storage < 0)
-    {
-        goto clean;
-    }
-
+    /* Obtener tamaño de bloque */
     uint16_t block_size;
-    if (get_block_size(client_socket_storage, &block_size))
+    if (get_block_size(socket_storage, &block_size) < 0)
     {
-        goto clean;
+        log_error(logger, "## Error al obtener tamaño de bloque del Storage");
+        goto cleanup;
     }
 
-    worker_config->block_size = (int)block_size;
-    log_info(logger, "## Tamaño de bloque recibido desde Storage: %d", worker_config->block_size);
+    config->block_size = block_size;
+    log_info(logger, "## Tamaño de bloque recibido: %d", config->block_size);
 
-    memory_manager_t *memory_manager = create_memory_manager(
-        worker_config->memory_size,
-        worker_config->replacement_algorithm,
-        worker_config->block_size);
+    /* Crear memoria interna */
+    memory_manager_t *mm = mm_create(
+        config->memory_size,
+        config->block_size,
+        (pt_replacement_t)config->replacement_algorithm);
 
-    if (memory_manager == NULL)
+    if (!mm)
     {
         log_error(logger, "## No se pudo inicializar la memoria interna");
-        goto clean;
+        goto cleanup;
     }
 
-    log_info(logger, "## Memoria interna creada (size=%d, page_size=%d, replacement=%s)",
-             worker_config->memory_size,
-             worker_config->block_size,
-             worker_config->replacement_algorithm);
+    log_info(logger, "## Memoria interna creada - tamaño: %d - tamaño de pagina: %d - politica de reemplazo: %s",
+             config->memory_size, config->block_size, config->replacement_algorithm);
 
-    worker_state_t worker_state = {
+    /* Crear estado global */
+    worker_state_t state = {
         .mux = PTHREAD_MUTEX_INITIALIZER,
         .has_query = false,
         .should_stop = false,
         .current_query = {.is_executing = false},
-        .master_socket = client_socket_master,
-        .storage_socket = client_socket_storage,
-        .config = worker_config,
+        .master_socket = socket_master,
+        .storage_socket = socket_storage,
+        .config = config,
         .logger = logger,
-        .memory_manager = memory_manager,
+        .memory_manager = mm,
         .worker_id = worker_id};
 
-    pthread_mutex_init(&worker_state.mux, NULL);
+    /* Crear hilos */
+    pthread_t listener_tid, executor_tid;
+    pthread_create(&listener_tid, NULL, master_listener_thread, &state);
+    pthread_create(&executor_tid, NULL, query_executor_thread, &state);
 
-    pthread_t executor_thread;
-    pthread_create(&executor_thread, NULL, query_executor_thread, &worker_state);
-    pthread_join(executor_thread, NULL);
+    pthread_join(listener_tid, NULL);
+    pthread_join(executor_tid, NULL);
 
-    mm_destroy(memory_manager);
-
-    destroy_worker_config(worker_config);
-    logger_destroy();
-    if (client_socket_master >= 0)
-        close(client_socket_master);
-    if (client_socket_storage >= 0)
-        close(client_socket_storage);
-    exit(EXIT_SUCCESS);
-
-clean:
-    if (client_socket_master >= 0)
-        close(client_socket_master);
-    if (client_socket_storage >= 0)
-        close(client_socket_storage);
-
-    destroy_worker_config(worker_config);
+cleanup:
+    if (socket_master >= 0)
+        close(socket_master);
+    if (socket_storage >= 0)
+        close(socket_storage);
+    if (config)
+        destroy_worker_config(config);
     logger_destroy();
     return 0;
+}
 
-error:
-    exit(EXIT_FAILURE);
+void *master_listener_thread(void *arg)
+{
+    worker_state_t *state = (worker_state_t *)arg;
+    t_log *logger = state->logger;
+
+    while (true)
+    {
+        t_package *pkg = package_receive(state->master_socket);
+        if (!pkg)
+        {
+            log_error(logger, "## Se perdió la conexión con el Master");
+            break;
+        }
+
+        switch (pkg->operation_code)
+        {
+        case OP_ASSIGN_QUERY:
+        {
+            uint32_t query_id, pc;
+            char *path = NULL;
+
+            if (!package_read_uint32(pkg, &query_id))
+                break;
+            if (!package_read_uint32(pkg, &pc))
+                break;
+            path = package_read_string(pkg);
+            if (!path)
+                break;
+
+            pthread_mutex_lock(&state->mux);
+            strcpy(state->current_query.query_path, path);
+            state->current_query.program_counter = pc;
+            state->current_query.query_id = query_id;
+            state->has_query = true;
+            state->should_stop = false;
+            pthread_mutex_unlock(&state->mux);
+
+            log_info(logger, "## Se asignó Query %d - Program Counter=%d - Ruta=%s", query_id, pc, path);
+            free(path);
+            break;
+        }
+
+        case OP_EJECT_QUERY:
+        {
+            uint32_t query_id;
+            if (!package_read_uint32(pkg, &query_id))
+                break;
+
+            pthread_mutex_lock(&state->mux);
+            if (state->has_query && state->current_query.query_id == query_id)
+                state->should_stop = true;
+            pthread_mutex_unlock(&state->mux);
+
+            log_info(logger, "## Se recibió solicitud de desalojo para Query %d", query_id);
+            break;
+        }
+
+        case OP_END_QUERY:
+            log_info(logger, "## Se recibió solicitud de finalización del Worker");
+            pthread_mutex_lock(&state->mux);
+            state->should_stop = true;
+            state->has_query = false;
+            pthread_mutex_unlock(&state->mux);
+            package_destroy(pkg);
+            return NULL;
+
+        default:
+            log_warning(logger, "## Código de operación desconocido: %d", pkg->operation_code);
+            break;
+        }
+
+        package_destroy(pkg);
+    }
+
+    return NULL;
 }
 
 void *query_executor_thread(void *arg)
@@ -163,70 +225,98 @@ void *query_executor_thread(void *arg)
 
     while (true)
     {
-        pthread_mutex_lock(&state->lock);
-        bool can_execute = state->has_query && !state->should_stop;
-        bool is_executing = state->current_query.is_executing;
-        pthread_mutex_unlock(&state->lock);
+        pthread_mutex_lock(&state->mux);
+        bool ready = state->has_query && !state->should_stop;
+        pthread_mutex_unlock(&state->mux);
 
-        if (!can_execute && !is_executing)
+        if (!ready)
         {
             usleep(MICROSECONDS_TO_SLEEP);
             continue;
         }
 
-        pthread_mutex_lock(&state->lock);
+        pthread_mutex_lock(&state->mux);
+        query_context_t ctx = state->current_query;
         state->current_query.is_executing = true;
-        char query_path[PATH_MAX];
-        strcpy(query_path, state->current_query.query_path);
-        int pc = state->current_query.program_counter;
-        pthread_mutex_unlock(&state->lock);
-
-        log_info(logger, "## Ejecutando Query: %s (PC=%d)", query_path, pc);
+        pthread_mutex_unlock(&state->mux);
 
         char *raw_instruction = NULL;
-        int fetch_result = fetch_instruction(query_path, pc, &raw_instruction);
-        if (fetch_result < 0)
+        if (fetch_instruction(ctx.query_path, ctx.program_counter, &raw_instruction) < 0)
         {
-            log_error(logger, "Error al hacer FETCH de la instrucción en PC=%d", pc);
+            log_error(state->logger, "## Query %d: Error en FETCH - Program Counter: %d", ctx.query_id, ctx.program_counter);
             goto finish_query;
         }
 
-        instruction_t *instruction = NULL;
-        decode_instruction(raw_instruction, &instruction);
-        free(raw_instruction);
+        char *op_instruction = string_split(raw_instruction, " ")[0];
 
-        if (instruction == NULL)
+        log_info(state->logger, "## Query %d: FETCH - Program Counter: %d - %s", ctx.query_id, ctx.program_counter, op_instruction);
+
+        instruction_t *instruction = malloc(sizeof(instruction_t));
+        if (decode_instruction(raw_instruction, instruction) < 0)
         {
-            log_error(logger, "No se pudo decodificar la instrucción (PC=%d)", pc);
+            log_error(state->logger, "## Query %d: Error al decodificar - %s", ctx.query_id, op_instruction);
+            free(raw_instruction);
+            free(instruction);
             goto finish_query;
         }
 
-        execute_instruction(
+        int exec_res = execute_instruction(
             instruction,
             state->storage_socket,
             state->master_socket,
             state->memory_manager,
-            state->current_query->query_id,
+            ctx.query_id,
             state->worker_id);
 
+        bool end_detected = (instruction->operation == END);
+
+        free_instruction(instruction);
         free(instruction);
 
-        pthread_mutex_lock(&state->lock);
-        state->current_query.program_counter++;
-        state->current_query.is_executing = false;
-        pthread_mutex_unlock(&state->lock);
+        if (exec_res < 0)
+        {
+            log_error(state->logger, "## Query %d: Falló la instrucción - %s", ctx.query_id, op_instruction);
+            free(raw_instruction);
+            goto finish_query;
+        }
+        log_info(state->logger, "## Query %d: Instrucción realizada: %s", ctx.query_id, raw_instruction);
+        free(raw_instruction);
 
-        usleep(state->config->memory_retardation);
+        pthread_mutex_lock(&state->mux);
+        if (!end_detected)
+            state->current_query.program_counter++;
+        bool eject = state->should_stop && !end_detected;
+        pthread_mutex_unlock(&state->mux);
+
+        if (eject)
+        {
+            log_info(state->logger, "## Query %d: Desalojada por pedido del Master", ctx.query_id);
+            pthread_mutex_lock(&state->mux);
+            state->has_query = false;
+            state->should_stop = false;
+            state->current_query.is_executing = false;
+            pthread_mutex_unlock(&state->mux);
+            continue;
+        }
+
+        if (end_detected)
+        {
+            log_info(state->logger, "## Query %d: Finalizada", ctx.query_id);
+            pthread_mutex_lock(&state->mux);
+            state->has_query = false;
+            state->current_query.is_executing = false;
+            pthread_mutex_unlock(&state->mux);
+            continue;
+        }
+
+        usleep(state->config->memory_retardation * 1000);
         continue;
 
     finish_query:
-        pthread_mutex_lock(&state->lock);
+        pthread_mutex_lock(&state->mux);
         state->has_query = false;
         state->current_query.is_executing = false;
-        pthread_mutex_unlock(&state->lock);
-        log_info(logger, "## Query finalizada o abortada");
-        continue;
+        pthread_mutex_unlock(&state->mux);
+        log_info(state->logger, "## Query %d: Abortada", ctx.query_id);
     }
-
-    return NULL;
 }
