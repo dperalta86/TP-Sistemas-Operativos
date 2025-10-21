@@ -165,6 +165,8 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
     goto clean_file;
   }
 
+  pthread_mutex_lock(&g_storage_bitmap_mutex);
+
   if (fread(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file) !=
       bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo leer el bitmap completo");
@@ -188,10 +190,13 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
     }
   }
 
-  // Escribir el bitmap modificado de vuelta al archivo
   fseek(bitmap_file, 0, SEEK_SET);
-  if (fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file) !=
-      bitmap_size_bytes) {
+
+  int written_bytes = fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file);
+
+  pthread_mutex_unlock(&g_storage_bitmap_mutex);
+
+  if (written_bytes != bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo escribir el bitmap modificado");
     retval = -3;
     goto clean_bitmap;

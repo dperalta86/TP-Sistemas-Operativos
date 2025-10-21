@@ -28,4 +28,6 @@ extern int g_worker_counter;
 // semáforos
 extern pthread_mutex_t g_worker_counter_mutex;
 
+extern pthread_mutex_t g_storage_bitmap_mutex;
+
 #endif

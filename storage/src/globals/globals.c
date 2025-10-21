@@ -6,3 +6,4 @@ int g_worker_counter = 0;
 
 // semáforos
 pthread_mutex_t g_worker_counter_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t g_storage_bitmap_mutex = PTHREAD_MUTEX_INITIALIZER;
