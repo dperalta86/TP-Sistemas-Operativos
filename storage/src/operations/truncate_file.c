@@ -86,7 +86,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     log_info(g_storage_logger,
              "El nuevo tamaño encaja en la misma cantidad de bloques, "
              "no se requiere truncado.");
-    goto clean_metadata_config;
+    goto clean_metadata_and_blocks;
   }
 
   char **new_blocks = string_array_new();
@@ -154,7 +154,9 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
 clean_new_blocks:
   if (new_blocks)
     string_array_destroy(new_blocks);
-clean_metadata_config:
+clean_metadata_and_blocks:
+  if (old_blocks)
+    string_array_destroy(old_blocks);
   config_destroy(metadata_config);
   return retval;
 }
