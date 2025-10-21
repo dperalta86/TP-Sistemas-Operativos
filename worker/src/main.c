@@ -112,7 +112,6 @@ int main(int argc, char *argv[])
 
     /* Crear estado global */
     worker_state_t state = {
-        .mux = PTHREAD_MUTEX_INITIALIZER,
         .has_query = false,
         .should_stop = false,
         .current_query = {.is_executing = false},
@@ -122,6 +121,7 @@ int main(int argc, char *argv[])
         .logger = logger,
         .memory_manager = mm,
         .worker_id = worker_id};
+    pthread_mutex_init(&state.mux, NULL);
 
     /* Crear hilos */
     pthread_t listener_tid, executor_tid;
@@ -149,6 +149,8 @@ cleanup:
     if (config)
         destroy_worker_config(config);
     logger_destroy();
+    mm_destroy(mm);
+    pthread_mutex_destroy(&state.mux);
     return 0;
 }
 
