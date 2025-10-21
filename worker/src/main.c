@@ -125,8 +125,18 @@ int main(int argc, char *argv[])
 
     /* Crear hilos */
     pthread_t listener_tid, executor_tid;
-    pthread_create(&listener_tid, NULL, master_listener_thread, &state);
-    pthread_create(&executor_tid, NULL, query_executor_thread, &state);
+    int rc_listener = pthread_create(&listener_tid, NULL, master_listener_thread, &state);
+    if (rc_listener != 0)
+    {
+        log_error(logger, "## No se pudo crear el hilo master_listener_thread (error %d)", rc_listener);
+        goto cleanup;
+    }
+    int rc_executor = pthread_create(&executor_tid, NULL, query_executor_thread, &state);
+    if (rc_executor != 0)
+    {
+        log_error(logger, "## No se pudo crear el hilo query_executor_thread (error %d)", rc_executor);
+        goto cleanup;
+    }
 
     pthread_join(listener_tid, NULL);
     pthread_join(executor_tid, NULL);
