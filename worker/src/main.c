@@ -226,16 +226,20 @@ void *query_executor_thread(void *arg)
     while (true)
     {
         pthread_mutex_lock(&state->mux);
-        bool ready = state->has_query && !state->should_stop;
-        pthread_mutex_unlock(&state->mux);
 
-        if (!ready)
+        if (state->should_stop && !state->has_query)
         {
+            pthread_mutex_unlock(&state->mux);
+            break; 
+        }
+
+        if (!state->has_query || state->should_stop)
+        {
+            pthread_mutex_unlock(&state->mux);
             usleep(MICROSECONDS_TO_SLEEP);
             continue;
         }
 
-        pthread_mutex_lock(&state->mux);
         query_context_t ctx = state->current_query;
         state->current_query.is_executing = true;
         pthread_mutex_unlock(&state->mux);
