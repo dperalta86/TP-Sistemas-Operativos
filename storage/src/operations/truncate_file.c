@@ -39,15 +39,15 @@ int delete_logical_block(const char *mount_point, const char *name,
   struct stat statbuf;
   if (stat(target_path, &statbuf) != 0) {
     log_error(g_storage_logger,
-              "No se pudo obtener el estado del bloque lógico %04d en %s",
-              logical_block_index, target_path);
+              "No se pudo obtener el estado del bloque físico %04d en %s",
+              physical_block_index, target_path);
     return -2;
   }
 
   if (statbuf.st_nlink != 1) {
     log_info(g_storage_logger,
-             "El bloque físico %s todavía tiene %lu hard links, no se libera",
-             target_path, statbuf.st_nlink);
+             "El bloque físico %04d todavía tiene %lu hard links, no se libera",
+             physical_block_index, statbuf.st_nlink);
     return 0;
   }
 
