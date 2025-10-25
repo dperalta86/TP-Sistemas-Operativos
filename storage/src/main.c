@@ -1,3 +1,4 @@
+#include "file_locks.h"
 #include "fresh_start/fresh_start.h"
 #include "globals/globals.h"
 #include "server/server.h"
@@ -19,7 +20,6 @@
 
 #define MODULO "STORAGE"
 #define DEFAULT_CONFIG_PATH "./storage.config"
-
 
 int main(int argc, char *argv[]) {
   // Obtiene posibles parametros de entrada
@@ -71,6 +71,9 @@ int main(int argc, char *argv[]) {
             g_storage_config->mount_point, g_storage_config->operation_delay,
             g_storage_config->block_access_delay,
             log_level_as_string(g_storage_config->log_level));
+
+  // Inicializa diccionario de file locks
+  g_open_files_dict = dictionary_create();
 
   // Verifica si se realiza fresh start
   if (g_storage_config->fresh_start) {
@@ -136,11 +139,13 @@ int main(int argc, char *argv[]) {
   }
 
   close(socket);
+  cleanup_file_sync();
   log_destroy(g_storage_logger);
   destroy_storage_config(g_storage_config);
   exit(EXIT_SUCCESS);
 
 clean_logger:
+  cleanup_file_sync();
   log_destroy(g_storage_logger);
 clean_config:
   destroy_storage_config(g_storage_config);

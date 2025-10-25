@@ -55,4 +55,25 @@ int delete_file_dir_structure(const char *mount_point, const char *file_name,
 int create_metadata_file(const char *mount_point, const char *file_name,
                          const char *tag, const char *initial_content);
 
+/**
+ * Lee el archivo superblock.config y obtiene la configuración del filesystem
+ *
+ * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param fs_size Pointer donde se almacenará el tamaño del filesystem
+ * @param block_size Pointer donde se almacenará el tamaño de los bloques
+ * @return 0 en caso de éxito, -1 si no puede abrir el archivo, -2 si faltan propiedades
+ */
+int read_superblock(const char* mount_point, int* fs_size, int* block_size);
+
+/**
+ * Modifica bits contiguos en el bitmap del filesystem
+ *
+ * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param start_index Índice del primer bloque a modificar
+ * @param count Cantidad de bits contiguos a modificar desde start_index
+ * @param set_bits 1 para setear bits (marcar como ocupados), 0 para unsetear (marcar como libres)
+ * @return 0 en caso de éxito, -1 si hay error abriendo bitmap, -2 si hay error de memoria, -3 si hay error escribiendo
+ */
+int modify_bitmap_bits(const char* mount_point, int start_index, size_t count, int set_bits);
+
 #endif

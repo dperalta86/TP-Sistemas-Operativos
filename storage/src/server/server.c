@@ -40,7 +40,7 @@ void *handle_client(void *arg) {
       response = create_file(request);
       break;
     case STORAGE_OP_FILE_TRUNCATE_REQ:
-      response = truncate_file(request);
+      response = handle_truncate_file_op_package(request);
       break;
     case STORAGE_OP_TAG_CREATE_REQ:
       response = create_tag(request);

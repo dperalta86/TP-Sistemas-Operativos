@@ -3,122 +3,128 @@
 
 static bool has_required_properties(t_config *config);
 
-t_storage_config *create_storage_config(const char *config_file_path)
-{
-    // LECTURA DE ARCHIVO CONFIG
-    t_config *config = config_create((char *)config_file_path);
-    if (!config)
-    {
-        fprintf(stderr, "No se pudo abrir el config: %s\n", config_file_path);
-        return NULL;
-    }
+t_storage_config *create_storage_config(const char *config_file_path) {
+  // LECTURA DE ARCHIVO CONFIG
+  t_config *config = config_create((char *)config_file_path);
+  if (!config) {
+    fprintf(stderr, "No se pudo abrir el config: %s\n", config_file_path);
+    return NULL;
+  }
 
-    if (!has_required_properties(config))
-    {
-        fprintf(stderr, "El archivo de configuración no tiene todas las propiedades requeridas: %s\n", config_file_path);
-        goto clean_config;
-    }
+  if (!has_required_properties(config)) {
+    fprintf(stderr,
+            "El archivo de configuración no tiene todas las propiedades "
+            "requeridas: %s\n",
+            config_file_path);
+    goto clean_config;
+  }
 
-    t_storage_config *storage_config = malloc(sizeof *storage_config);
-    if (!storage_config)
-    {
-        fprintf(stderr, "No se pudo reservar memoria para storage_config: %s\n", strerror(errno));
-        goto clean_config;
-    }
+  t_storage_config *storage_config = malloc(sizeof *storage_config);
+  if (!storage_config) {
+    fprintf(stderr, "No se pudo reservar memoria para storage_config: %s\n",
+            strerror(errno));
+    goto clean_config;
+  }
 
-    storage_config->operation_delay = config_get_int_value(config, "OPERATION_DELAY");
-    storage_config->block_access_delay = config_get_int_value(config, "BLOCK_ACCESS_DELAY");
+  storage_config->operation_delay =
+      config_get_int_value(config, "OPERATION_DELAY");
+  storage_config->block_access_delay =
+      config_get_int_value(config, "BLOCK_ACCESS_DELAY");
 
-    char *storage_ip_str = strdup(config_get_string_value(config, "STORAGE_IP"));
-    if (!storage_ip_str)
-        goto cleanup;
-    storage_config->storage_ip = storage_ip_str;
+  char *storage_ip_str = strdup(config_get_string_value(config, "STORAGE_IP"));
+  if (!storage_ip_str)
+    goto cleanup;
+  storage_config->storage_ip = storage_ip_str;
 
-    char *storage_port_str = strdup(config_get_string_value(config, "STORAGE_PORT"));
-    if (!storage_port_str)
-        goto cleanup;
-    storage_config->storage_port = storage_port_str;
+  char *storage_port_str =
+      strdup(config_get_string_value(config, "STORAGE_PORT"));
+  if (!storage_port_str)
+    goto cleanup;
+  storage_config->storage_port = storage_port_str;
 
-    char *mount_point_str = strdup(config_get_string_value(config, "MOUNT_POINT"));
-    if (!mount_point_str)
-        goto cleanup;
-    storage_config->mount_point = mount_point_str;
+  char *mount_point_str =
+      strdup(config_get_string_value(config, "MOUNT_POINT"));
+  if (!mount_point_str)
+    goto cleanup;
+  storage_config->mount_point = mount_point_str;
 
-    char *log_level_str = strdup(config_get_string_value(config, "LOG_LEVEL"));
-    if (!log_level_str)
-        goto cleanup;
-    storage_config->log_level = log_level_from_string(log_level_str);
+  char *log_level_str = strdup(config_get_string_value(config, "LOG_LEVEL"));
+  if (!log_level_str)
+    goto cleanup;
+  storage_config->log_level = log_level_from_string(log_level_str);
 
-    char *fresh_start_str = strdup(config_get_string_value(config, "FRESH_START"));
-    if (!fresh_start_str)
-        goto cleanup;
-    storage_config->fresh_start = strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0 ? true : false;
+  char *fresh_start_str =
+      strdup(config_get_string_value(config, "FRESH_START"));
+  if (!fresh_start_str)
+    goto cleanup;
+  storage_config->fresh_start = strcmp(fresh_start_str, "TRUE") == 0 ||
+                                        strcmp(fresh_start_str, "true") == 0
+                                    ? true
+                                    : false;
 
-    // LECTURA DE ARCHIVO SUPERBLOCK CONFIG
-    char superblock_path[PATH_MAX];
-    snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", storage_config->mount_point);
+  // LECTURA DE ARCHIVO SUPERBLOCK CONFIG
+  char superblock_path[PATH_MAX];
+  snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config",
+           storage_config->mount_point);
 
-    t_config *superblock_config = config_create(superblock_path);
-    if (!superblock_config) {
-        fprintf(stderr, "No se pudo abrir el archivo: %s\n", superblock_path);
-        return NULL;
-    }
+  t_config *superblock_config = config_create(superblock_path);
+  if (!superblock_config) {
+    fprintf(stderr, "No se pudo abrir el archivo: %s\n", superblock_path);
+    return NULL;
+  }
 
-    if (!config_has_property(superblock_config, "FS_SIZE") || !config_has_property(superblock_config, "BLOCK_SIZE")) {
-        fprintf(stderr, "El superblock.config no tiene las propiedades requeridas (FS_SIZE, BLOCK_SIZE)");
-        config_destroy(superblock_config);
-        return NULL;
-    }
-
-    storage_config->fs_size = config_get_int_value(superblock_config, "FS_SIZE");
-    storage_config->block_size = config_get_int_value(superblock_config, "BLOCK_SIZE");
-
+  if (!config_has_property(superblock_config, "FS_SIZE") ||
+      !config_has_property(superblock_config, "BLOCK_SIZE")) {
+    fprintf(stderr, "El superblock.config no tiene las propiedades requeridas "
+                    "(FS_SIZE, BLOCK_SIZE)");
     config_destroy(superblock_config);
-    free(fresh_start_str);
-    free(log_level_str);
-    config_destroy(config);
-    return storage_config;
+    return NULL;
+  }
+
+  storage_config->fs_size = config_get_int_value(superblock_config, "FS_SIZE");
+  storage_config->block_size =
+      config_get_int_value(superblock_config, "BLOCK_SIZE");
+
+  int total_blocks = storage_config->fs_size / storage_config->block_size;
+  storage_config->bitmap_size_bytes =
+      (total_blocks + 7) / 8; // Redondeamos al próximo byte
+
+  config_destroy(superblock_config);
+  free(fresh_start_str);
+  free(log_level_str);
+  config_destroy(config);
+  return storage_config;
 
 cleanup:
-    destroy_storage_config(storage_config);
+  destroy_storage_config(storage_config);
 
 clean_config:
-    config_destroy(config);
-    return NULL;
+  config_destroy(config);
+  return NULL;
 }
 
-void destroy_storage_config(t_storage_config *storage_config)
-{
-    if (!storage_config)
-        return;
+void destroy_storage_config(t_storage_config *storage_config) {
+  if (!storage_config)
+    return;
 
-    free(storage_config->storage_ip);
-    free(storage_config->storage_port);
-    free(storage_config->mount_point);
+  free(storage_config->storage_ip);
+  free(storage_config->storage_port);
+  free(storage_config->mount_point);
 
-    free(storage_config);
+  free(storage_config);
 }
 
-static bool has_required_properties(t_config *config)
-{
-    char *required_props[] = {
-        "STORAGE_IP",
-        "STORAGE_PORT",
-        "FRESH_START",
-        "MOUNT_POINT",
-        "OPERATION_DELAY",
-        "BLOCK_ACCESS_DELAY",
-        "LOG_LEVEL"
-    };
+static bool has_required_properties(t_config *config) {
+  char *required_props[] = {
+      "STORAGE_IP",      "STORAGE_PORT",       "FRESH_START", "MOUNT_POINT",
+      "OPERATION_DELAY", "BLOCK_ACCESS_DELAY", "LOG_LEVEL"};
 
-    size_t keys_amount = config_keys_amount(config);
-    for (size_t i = 0; i < keys_amount; ++i)
-    {
-        if (!config_has_property(config, required_props[i]))
-        {
-            fprintf(stderr, "Falta propiedad requerida: %s\n", required_props[i]);
-            return false;
-        }
+  size_t keys_amount = config_keys_amount(config);
+  for (size_t i = 0; i < keys_amount; ++i) {
+    if (!config_has_property(config, required_props[i])) {
+      fprintf(stderr, "Falta propiedad requerida: %s\n", required_props[i]);
+      return false;
     }
-    return true;
+  }
+  return true;
 }
