@@ -21,15 +21,6 @@
  */
 int wipe_storage_content(const char* mount_point);
 
-/**
- * Lee el archivo superblock.config y obtiene la configuración del filesystem
- * 
- * @param mount_point Ruta del directorio donde está montado el filesystem
- * @param fs_size Puntero donde se almacenará el tamaño del filesystem
- * @param block_size Puntero donde se almacenará el tamaño de los bloques
- * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si faltan propiedades
- */
-int read_superblock(const char* mount_point, int* fs_size, int* block_size);
 
 /**
  * Crea el bitmap que dice qué bloques están libres o ocupados

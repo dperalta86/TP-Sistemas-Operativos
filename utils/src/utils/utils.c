@@ -21,3 +21,18 @@ size_t strlcpy(char *dest, const char *source, size_t size) {
 
     return strlen(source);
 }
+
+char* get_stringified_array(char** array) {
+    char* resultado = string_new();
+    string_append(&resultado, "[");
+    
+    for(int i = 0; array[i] != NULL; i++) {
+        if(i > 0) {
+            string_append(&resultado, ",");
+        }
+        string_append(&resultado, array[i]);
+    }
+    
+    string_append(&resultado, "]");
+    return resultado;
+}

@@ -35,45 +35,6 @@ int wipe_storage_content(const char *mount_point) {
 }
 
 /**
- * Lee el archivo superblock.config y obtiene la configuración del filesystem
- *
- * @param mount_point Ruta del directorio donde está montado el filesystem
- * @param fs_size Puntero donde se almacenará el tamaño del filesystem
- * @param block_size Puntero donde se almacenará el tamaño de los bloques
- * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si faltan
- * propiedades
- */
-int read_superblock(const char *mount_point, int *fs_size, int *block_size) {
-  char superblock_path[PATH_MAX];
-  snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config",
-           mount_point);
-
-  t_config *config = config_create(superblock_path);
-  if (config == NULL) {
-    log_error(g_storage_logger, "No se pudo abrir el archivo %s",
-              superblock_path);
-    return -1;
-  }
-
-  if (!config_has_property(config, "FS_SIZE") ||
-      !config_has_property(config, "BLOCK_SIZE")) {
-    log_error(g_storage_logger, "El superblock no tiene las propiedades "
-                                "requeridas (FS_SIZE, BLOCK_SIZE)");
-    config_destroy(config);
-    return -2;
-  }
-
-  *fs_size = config_get_int_value(config, "FS_SIZE");
-  *block_size = config_get_int_value(config, "BLOCK_SIZE");
-
-  config_destroy(config);
-
-  log_info(g_storage_logger, "Superblock leído: FS_SIZE=%d, BLOCK_SIZE=%d",
-           *fs_size, *block_size);
-  return 0;
-}
-
-/**
  * Crea el bitmap que dice qué bloques están libres o ocupados
  *
  * @param mount_point Ruta del directorio donde está montado el filesystem
@@ -191,7 +152,7 @@ int init_physical_blocks(const char *mount_point, int fs_size, int block_size) {
 // Desactiva el warning de GCC sobre truncamiento de snprintf
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(new_block_path, sizeof(new_block_path), "%s/block%04d.dat",
+    snprintf(new_block_path, sizeof(new_block_path), "%s/%04d.dat",
              physical_blocks_dir_path, i);
 #pragma GCC diagnostic pop
 
@@ -232,11 +193,9 @@ int init_files(const char *mount_point) {
     return -1;
   }
 
-  snprintf(source_path, PATH_MAX, "%s/physical_blocks/block0000.dat",
-           mount_point);
+  snprintf(source_path, PATH_MAX, "%s/physical_blocks/0000.dat", mount_point);
   snprintf(target_path, PATH_MAX,
-           "%s/files/initial_file/BASE/logical_blocks/block0000.dat",
-           mount_point);
+           "%s/files/initial_file/BASE/logical_blocks/0000.dat", mount_point);
   if (link(source_path, target_path) != 0) {
     log_error(g_storage_logger, "No se pudo crear el hard link %s -> %s",
               source_path, target_path);

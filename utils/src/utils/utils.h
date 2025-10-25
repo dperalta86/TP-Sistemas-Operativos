@@ -9,10 +9,13 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <commons/string.h>
 
 t_log* create_logger(char *directory, char *process_name, bool is_active_console, t_log_level log_level);
 
 int log_set_level(t_log* logger, t_log_level new_log_level);
 size_t strlcpy(char *dest, const char *src, size_t size);
+
+char* get_stringified_array(char** array);
 
 #endif
