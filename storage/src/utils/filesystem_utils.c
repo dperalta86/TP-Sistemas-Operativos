@@ -3,13 +3,16 @@
 #include "../globals/globals.h"
 #include <commons/bitarray.h>
 #include <commons/config.h>
+#include <commons/string.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <utils/logger.h>
+#include <utils/utils.h>
 
-int create_dir_recursive(const char *path) {
+filesystemint create_dir_recursive(const char *path) {
   char command[PATH_MAX + 20];
   snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
 
@@ -126,6 +129,11 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   char *bitmap_buffer = NULL;
   t_bitarray *bitmap = NULL;
 
+  if (!g_storage_config) {
+    log_error(g_storage_logger, "g_storage_config es NULL");
+    return -4;
+  }
+
   size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
 
   char bitmap_path[PATH_MAX];
@@ -143,7 +151,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   if (!bitmap_buffer) {
     log_error(g_storage_logger, "No se pudo asignar memoria para el bitmap");
     retval = -2;
-    goto clean_file;
+    goto clean_bitmap;
   }
 
   pthread_mutex_lock(&g_storage_bitmap_mutex);
@@ -152,7 +160,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
       bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo leer el bitmap completo");
     retval = -1;
-    goto clean_buffer;
+    goto unlock_mutex;
   }
 
   bitmap =
@@ -160,7 +168,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   if (!bitmap) {
     log_error(g_storage_logger, "No se pudo crear el bitmap en memoria");
     retval = -2;
-    goto clean_buffer;
+    goto unlock_mutex;
   }
 
   for (size_t i = 0; i < count; i++) {
@@ -175,26 +183,193 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
 
   int written_bytes = fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file);
 
-  pthread_mutex_unlock(&g_storage_bitmap_mutex);
-
   if (written_bytes != bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo escribir el bitmap modificado");
     retval = -3;
-    goto clean_bitmap;
+  } else {
+    log_info(g_storage_logger, "Modificados %zu bits en el bitmap (%s)", count,
+             set_bits ? "seteados" : "unseteados");
   }
 
-  log_info(g_storage_logger, "Modificados %zu bits en el bitmap (%s)", count,
-           set_bits ? "seteados" : "unseteados");
-
+  bitarray_destroy(bitmap);
+unlock_mutex:
+  pthread_mutex_unlock(&g_storage_bitmap_mutex);
 clean_bitmap:
-  if (bitmap)
-    bitarray_destroy(bitmap);
-clean_buffer:
-  if (bitmap_buffer)
-    free(bitmap_buffer);
-clean_file:
-  if (bitmap_file)
-    fclose(bitmap_file);
+  free(bitmap_buffer);
+  fclose(bitmap_file);
 end:
   return retval;
+}
+
+t_file_metadata *read_file_metadata(const char *mount_point,
+                                    const char *filename, const char *tag) {
+  char metadata_path[PATH_MAX];
+  snprintf(metadata_path, sizeof(metadata_path),
+           "%s/files/%s/%s/metadata.config", mount_point, filename, tag);
+
+  t_config *config = config_create(metadata_path);
+  if (!config) {
+    log_error(g_storage_logger, "No se pudo abrir el metadata.config: %s",
+              metadata_path);
+    return NULL;
+  }
+
+  if (!config_has_property(config, "SIZE") ||
+      !config_has_property(config, "BLOCKS") ||
+      !config_has_property(config, "ESTADO")) {
+    log_error(g_storage_logger,
+              "El metadata.config no tiene las propiedades requeridas "
+              "(SIZE, BLOCKS, ESTADO)");
+    config_destroy(config);
+    return NULL;
+  }
+
+  t_file_metadata *metadata = malloc(sizeof(t_file_metadata));
+  if (!metadata) {
+    log_error(g_storage_logger,
+              "No se pudo asignar memoria para t_file_metadata");
+    config_destroy(config);
+    return NULL;
+  }
+
+  metadata->size = config_get_int_value(config, "SIZE");
+
+  char *state_value = config_get_string_value(config, "ESTADO");
+  metadata->state = string_duplicate(state_value);
+
+  char **blocks_str = config_get_array_value(config, "BLOCKS");
+  metadata->block_count = string_array_size(blocks_str);
+
+  if (metadata->block_count > 0) {
+    metadata->blocks = malloc(sizeof(int) * metadata->block_count);
+    if (!metadata->blocks) {
+      log_error(g_storage_logger,
+                "No se pudo asignar memoria para el array de bloques");
+      string_array_destroy(blocks_str);
+      free(metadata->state);
+      free(metadata);
+      config_destroy(config);
+      return NULL;
+    }
+
+    for (int i = 0; i < metadata->block_count; i++) {
+      metadata->blocks[i] = atoi(blocks_str[i]);
+    }
+  } else {
+    metadata->blocks = NULL;
+  }
+
+  metadata->config = config;
+  string_array_destroy(blocks_str);
+
+  log_info(g_storage_logger,
+           "Metadata leído: %s:%s - SIZE=%d, BLOCKS=%d, ESTADO=%s", filename,
+           tag, metadata->size, metadata->block_count, metadata->state);
+
+  return metadata;
+}
+
+int save_file_metadata(t_file_metadata *metadata) {
+  if (!metadata || !metadata->config) {
+    log_error(g_storage_logger, "Metadata o config es NULL");
+    return -1;
+  }
+
+  char field_str[32];
+  snprintf(field_str, sizeof(field_str), "%d", metadata->size);
+  config_set_value(metadata->config, "SIZE", field_str);
+
+  // Si no tenemos BLOCKS, escribimos `[]`
+  char *stringified_blocks;
+  if (metadata->blocks == NULL || metadata->block_count == 0) {
+    stringified_blocks = string_duplicate("[]");
+  } else {
+    char **blocks_str_array = string_array_new();
+
+    for (int i = 0; i < metadata->block_count; i++) {
+      snprintf(field_str, sizeof(field_str), "%d", metadata->blocks[i]);
+      string_array_push(&blocks_str_array, string_duplicate(field_str));
+    }
+
+    stringified_blocks = get_stringified_array(blocks_str_array);
+    string_array_destroy(blocks_str_array);
+  }
+
+  config_set_value(metadata->config, "BLOCKS", stringified_blocks);
+  free(stringified_blocks);
+
+  config_set_value(metadata->config, "ESTADO", metadata->state);
+
+  config_save(metadata->config);
+  log_info(g_storage_logger, "Metadata guardada");
+  return 0;
+}
+
+void destroy_file_metadata(t_file_metadata *metadata) {
+  if (!metadata) {
+    return;
+  }
+
+  if (metadata->blocks)
+    free(metadata->blocks);
+
+  if (metadata->state)
+    free(metadata->state);
+
+  if (metadata->config)
+    config_destroy(metadata->config);
+
+  free(metadata);
+}
+
+int delete_logical_block(const char *mount_point, const char *name,
+                         const char *tag, int logical_block_index,
+                         int physical_block_index, uint32_t query_id) {
+  char target_path[PATH_MAX];
+  snprintf(target_path, sizeof(target_path),
+           "%s/files/%s/%s/logical_blocks/%04d.dat", mount_point, name, tag,
+           logical_block_index);
+
+  if (remove(target_path) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo eliminar el bloque lógico %04d en %s",
+              logical_block_index, target_path);
+    return -1;
+  }
+
+  log_info(g_storage_logger,
+           "##%u - Bloque Lógico Eliminado - Nombre: %s, Tag: %s, "
+           "Índice: %04d",
+           query_id, name, tag, logical_block_index);
+
+  snprintf(target_path, sizeof(target_path), "%s/physical_blocks/block%04d.dat",
+           mount_point, physical_block_index);
+
+  struct stat statbuf;
+  if (stat(target_path, &statbuf) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo obtener el estado del bloque físico %04d en %s",
+              physical_block_index, target_path);
+    return -2;
+  }
+
+  if (statbuf.st_nlink != 1) {
+    log_info(g_storage_logger,
+             "El bloque físico %04d todavía tiene %lu hard links, no se libera",
+             physical_block_index, statbuf.st_nlink);
+    return 0;
+  }
+
+  if (modify_bitmap_bits(mount_point, physical_block_index, 1, 0) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo liberar el bloque físico %04d en el bitmap",
+              physical_block_index);
+    return -3;
+  }
+
+  log_info(g_storage_logger,
+           "##%u - Bloque Físico Liberado - Número de Bloque: %04d", query_id,
+           physical_block_index);
+
+  return 0;
 }

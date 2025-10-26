@@ -1,4 +1,5 @@
 #include "server.h"
+#include "operations/delete_tag.h"
 #include <stdbool.h>
 
 int wait_for_client(int server_socket) {
@@ -55,7 +56,7 @@ void *handle_client(void *arg) {
       response = read_block(request);
       break;
     case STORAGE_OP_TAG_DELETE_REQ:
-      response = delete_tag(request);
+      response = handle_delete_tag_op_package(request);
       break;
     default:
       log_error(g_storage_logger,

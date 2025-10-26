@@ -223,6 +223,31 @@ context(test_ops) {
       should_ptr(strstr(metadata_content, "BLOCKS=[1,2]")) not be null;
     }
     end
+
+    it("trunca archivo a tamaño 0") {
+      _create_file(14, "test_truncate_zero", "v1", TEST_MOUNT_POINT);
+
+      char metadata_path[PATH_MAX];
+      snprintf(metadata_path, sizeof(metadata_path),
+               "%s/files/test_truncate_zero/v1/metadata.config",
+               TEST_MOUNT_POINT);
+      FILE *metadata = fopen(metadata_path, "w");
+      fprintf(metadata,
+              "SIZE=512\nBLOCKS=[1,2,3,4]\nESTADO=WORK_IN_PROGRESS\n");
+      fclose(metadata);
+
+      int result =
+          truncate_file(15, "test_truncate_zero", "v1", 0, TEST_MOUNT_POINT);
+
+      should_int(result) be equal to(0);
+
+      char metadata_content[256];
+      read_file_contents(metadata_path, metadata_content,
+                         sizeof(metadata_content));
+      should_ptr(strstr(metadata_content, "SIZE=0")) not be null;
+      should_ptr(strstr(metadata_content, "BLOCKS=[]")) not be null;
+    }
+    end
   }
   end
 
