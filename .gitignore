@@ -64,3 +64,5 @@ dkms.conf
 .cache/
 .clangd
 compile_commands.json
+so-commons-library/
+Master of Files.pdf
