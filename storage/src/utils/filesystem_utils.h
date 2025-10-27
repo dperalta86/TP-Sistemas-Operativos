@@ -163,7 +163,7 @@ bool file_dir_exists(const char *file_name, const char *tag);
  * @param path_size Tamaño del buffer logical_block_path.
  * @return bool true si el hardlink existe, false en caso contrario.
  */
-bool logical_block_exists(char *file_name, char *tag, uint32_t block_number, char *logical_block_path, size_t path_size);
+bool logical_block_exists(const char *file_name, const char *tag, uint32_t block_number, char *logical_block_path, size_t path_size);
 
 /**
  * Verifica la existencia de un archivo de bloque físico.
@@ -176,16 +176,12 @@ bool logical_block_exists(char *file_name, char *tag, uint32_t block_number, cha
 bool physical_block_exists(uint32_t block_number, char *physical_block_path, size_t path_size);
 
 /**
- * Determina si un bloque físico es compartido por múltiples hardlinks.
+ * Devuelve la cantidad de hardlinks de un bloque físico.
  * 
  * @param logical_block_path Ruta completa a un hardlink lógico que apunta al bloque físico.
- * @return bool true si el bloque físico tiene múltiples hardlinks, false en caso contrario.
- * 
- * @note: Un bloque físico con más de 2 hardlinks (archivo bloque físico y archivo bloque 
- * lógico) indica que está siendo compartido. Esta verificación se realiza antes de eliminar
- * un hardlink.
+ * @return int positivo que indica la cantidad de hardlinks del bloque físico, -1 en caso contrario.
  */
-bool ph_block_has_many_hl(char *logical_block_path);
+int ph_block_links(char *logical_block_path);
 
 /**
  * Abre el archivo binario del bitmap en el modo especificado.
@@ -200,11 +196,11 @@ FILE *open_bitmap_file(const char *modes);
  * La función maneja internamente el bloqueo del mutex global g_storage_bitmap_mutex, 
  * pero lo deja desbloqueado en caso de error.
  * 
- * @param bitmap Puntero a t_bitarray donde se almacenará la estructura.
- * @param bitmap_buffer Puntero al char donde se almacenará el buffer crudo.
+ * @param bitmap Doble puntero a t_bitarray donde se almacenará la estructura.
+ * @param bitmap_buffer Doble puntero al char donde se almacenará el buffer crudo.
  * @return int 0 si la carga es exitosa, un valor negativo en caso de error.
  */
-int bitmap_load(t_bitarray *bitmap, char *bitmap_buffer);
+int bitmap_load(t_bitarray **bitmap, char **bitmap_buffer);
 
 /**
  * Persiste el bitmap modificado a disco.

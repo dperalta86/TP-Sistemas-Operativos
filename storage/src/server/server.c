@@ -50,7 +50,7 @@ void *handle_client(void *arg) {
       response = commit_tag(request);
       break;
     case STORAGE_OP_BLOCK_WRITE_REQ:
-      response = write_block(request);
+      response = handle_write_block_request(request);
       break;
     case STORAGE_OP_BLOCK_READ_REQ:
       response = read_block(request);

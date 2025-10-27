@@ -394,13 +394,14 @@ t_package *prepare_error_response(uint32_t query_id, t_storage_op_code op_code, 
   if(!package_add_int8(response, op_error_code))
   {
     log_error(g_storage_logger, "## Query ID: %d - Fallo al agregar el código de error al paquete de respuesta", query_id);
+    package_destroy(response);
     return NULL;
   }
 
   return response;
 }
 
-bool logical_block_exists(char *file_name, char *tag, uint32_t block_number, char *logical_block_path, size_t path_size) {
+bool logical_block_exists(const char *file_name, const char *tag, uint32_t block_number, char *logical_block_path, size_t path_size) {
   snprintf(logical_block_path, path_size, "%s/files/%s/%s/logical_blocks/%04d.dat", g_storage_config->mount_point, file_name, tag, block_number);
 
   return regular_file_exists(logical_block_path);
@@ -412,11 +413,14 @@ bool physical_block_exists(uint32_t block_number, char *physical_block_path, siz
   return regular_file_exists(physical_block_path);
 }
 
-bool ph_block_has_many_hl(char *logical_block_path) {
+int ph_block_links(char *logical_block_path) {
   struct stat file_stat;
-  stat(logical_block_path, &file_stat);
+  if(stat(logical_block_path, &file_stat) != 0) {
+    log_error(g_storage_logger, "No se pudo obtener el estado del bloque %s", logical_block_path);
+    return -1;
+  }
 
-  return file_stat.st_nlink > 2;
+  return file_stat.st_nlink;
 }
 
 ssize_t get_free_bit_index(t_bitarray *bitmap) {
@@ -443,7 +447,7 @@ FILE *open_bitmap_file(const char *modes) {
   return bitmap_file;
 }
 
-int bitmap_load(t_bitarray *bitmap, char *bitmap_buffer) {
+int bitmap_load(t_bitarray **bitmap, char **bitmap_buffer) {
   int retval = 0;
   size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
 
@@ -453,7 +457,7 @@ int bitmap_load(t_bitarray *bitmap, char *bitmap_buffer) {
     goto end;
   }
 
-  bitmap_buffer = calloc(1, bitmap_size_bytes);
+  *bitmap_buffer = calloc(1, bitmap_size_bytes);
   if (!bitmap_buffer) {
     log_error(g_storage_logger, "No se pudo asignar memoria para el bitmap");
     retval = -2;
@@ -470,7 +474,7 @@ int bitmap_load(t_bitarray *bitmap, char *bitmap_buffer) {
     goto clean_file;
   }
 
-  bitmap = bitarray_create_with_mode(bitmap_buffer, bitmap_size_bytes, MSB_FIRST);
+  *bitmap = bitarray_create_with_mode(*bitmap_buffer, bitmap_size_bytes, MSB_FIRST);
   if (!bitmap) {
     log_error(g_storage_logger, "No se pudo crear el bitmap en memoria");
     pthread_mutex_unlock(&g_storage_bitmap_mutex);
