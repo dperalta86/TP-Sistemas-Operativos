@@ -103,7 +103,6 @@ end:
 
 int create_new_hardlink(uint32_t query_id, char *logical_block_path,
                         ssize_t physical_block_index) {
-  char physical_block_path[PATH_MAX];
 
   size_t bitmap_bits = g_storage_config->bitmap_size_bytes * 8;
   if (physical_block_index < 0 || (size_t)physical_block_index >= bitmap_bits) {
@@ -114,6 +113,7 @@ int create_new_hardlink(uint32_t query_id, char *logical_block_path,
     return -1;
   }
 
+  char physical_block_path[PATH_MAX];
   snprintf(physical_block_path, sizeof(physical_block_path),
            "%s/physical_blocks/block%04zd.dat", g_storage_config->mount_point,
            physical_block_index);
@@ -192,16 +192,19 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
     goto cleanup_metadata;
   }
 
-  char logical_block_path[PATH_MAX];
-  if (!logical_block_exists(name, tag, block_number, logical_block_path,
-                            sizeof(logical_block_path))) {
+  if (block_number < 0 || (int)block_number >= metadata->block_count) {
     log_error(g_storage_logger,
-              "## Query ID: %d - El bloque lógico %d no existe en %s:%s.",
-              query_id, block_number, name, tag);
+              "## Query ID: %d - El bloque lógico %d no existe en %s:%s. Fuera "
+              "de rango [0, %d]",
+              query_id, block_number, name, tag, metadata->block_count);
     retval = READ_OUT_OF_BOUNDS;
     goto cleanup_metadata;
   }
 
+  char logical_block_path[PATH_MAX];
+  snprintf(logical_block_path, sizeof(logical_block_path),
+           "%s/files/%s/%s/logical_blocks/%04d.dat",
+           g_storage_config->mount_point, name, tag, block_number);
   int num_hardlinks = ph_block_links(logical_block_path);
   if (num_hardlinks < 0) {
     retval = -1;
