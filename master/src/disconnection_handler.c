@@ -11,18 +11,41 @@
 #include "worker_manager.h"
 #include "connection/serialization.h"
 
+// --- Query por ID ---
 static int running_query_id_for_predicate = -1;
+
 static bool predicate_query_id_equals_running_id(void *elem) {
     t_query_control_block *query = (t_query_control_block*)elem;
     return query && (query->query_id == running_query_id_for_predicate);
 }
 
+// --- Worker por ID ---
 static int search_worker_id = -1;
+
 static bool match_worker_by_id(void *element) {
     t_worker_control_block *worker = (t_worker_control_block *) element;
     if (worker == NULL) return false;
     return (worker->worker_id == search_worker_id);
 }
+
+// --- Query por socket_fd ---
+static int search_query_socket_fd = -1;
+
+static bool match_query_by_socket(void *element) {
+    t_query_control_block *query = (t_query_control_block *)element;
+    if (!query) return false;
+    return (query->socket_fd == search_query_socket_fd);
+}
+
+// --- Worker por socket_fd ---
+static int search_worker_socket_fd = -1;
+
+static bool match_worker_by_socket(void *element) {
+    t_worker_control_block *worker = (t_worker_control_block *)element;
+    if (!worker) return false;
+    return (worker->socket_fd == search_worker_socket_fd);
+}
+
 
 int handle_query_control_disconnection(int client_socket, t_master *master) {
     if (master == NULL || master->queries_table == NULL) {
@@ -169,7 +192,7 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
 
     // Buscar worker por assigned_worker_id en workers_table
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Error al bloquear worker_table_mutex (best-effort continue)");
+        log_error(master->logger, "[cancel_query_in_exec] Error al bloquear worker_table_mutex (continuando best-effort)");
         // continue best-effort
     }
 
@@ -181,19 +204,19 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
     }
 
     if (!target_worker) {
-        log_error(master->logger, "[cancel_query_in_exec] Assigned worker id=%d not found", qcb->assigned_worker_id);
+        log_error(master->logger, "[cancel_query_in_exec] No se encontró el worker asignado con id=%d", qcb->assigned_worker_id);
         if (pthread_mutex_unlock(&master->workers_table->worker_table_mutex) != 0) {
-            log_error(master->logger, "[cancel_query_in_exec] Error unlocking worker_table_mutex");
+            log_error(master->logger, "[cancel_query_in_exec] Error al desbloquear worker_table_mutex");
         }
         // finalizar query con error ya que worker no está disponible
-        finalize_query_with_error(qcb, master, "Assigned worker not available to evict query");
+        finalize_query_with_error(qcb, master, "Worker asignado no disponible para desalojar query");
         return -1;
     }
 
     // Si el worker no tiene socket válido -> finalizar con error
     if (target_worker->socket_fd <= 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Worker ID=%d has invalid socket (%d)", target_worker->worker_id, target_worker->socket_fd);
-        finalize_query_with_error(qcb, master, "Assigned worker socket invalid during cancellation");
+        log_error(master->logger, "[cancel_query_in_exec] Worker ID=%d tiene socket inválido (%d)", target_worker->worker_id, target_worker->socket_fd);
+        finalize_query_with_error(qcb, master, "Socket del worker inválido durante cancelación");
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
         return -1;
     }
@@ -201,31 +224,31 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
     // Enviar petición de eviction al worker
     t_package *pkg = package_create_empty(OP_WORKER_EVICT_REQ);
     if (!pkg) {
-        log_error(master->logger, "[cancel_query_in_exec] Cannot create eviction package");
+        log_error(master->logger, "[cancel_query_in_exec] No se pudo crear paquete de desalojo");
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Internal error: couldn't create eviction package");
+        finalize_query_with_error(qcb, master, "Error interno: no se pudo crear paquete de desalojo");
         return -1;
     }
 
     // Agregamos query_id para que el worker sepa qué desalojar
     if (!package_add_uint32(pkg, (uint32_t)qcb->query_id)) {
-        log_error(master->logger, "[cancel_query_in_exec] Error adding query_id to eviction package");
+        log_error(master->logger, "[cancel_query_in_exec] Error al agregar query_id al paquete de desalojo");
         package_destroy(pkg);
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Internal error: couldn't serialize eviction package");
+        finalize_query_with_error(qcb, master, "Error interno: no se pudo serializar paquete de desalojo");
         return -1;
     }
 
     if (package_send(pkg, target_worker->socket_fd) != 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Error sending eviction request to Worker ID=%d (socket=%d)",
+        log_error(master->logger, "[cancel_query_in_exec] Error al enviar solicitud de desalojo al Worker ID=%d (socket=%d)",
                   target_worker->worker_id, target_worker->socket_fd);
         package_destroy(pkg);
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Failed to send eviction request to worker");
+        finalize_query_with_error(qcb, master, "Falló el envío de solicitud de desalojo al worker");
         return -1;
     }
 
-    log_info(master->logger, "[cancel_query_in_exec] Eviction request sent to Worker ID=%d for Query ID=%d",
+    log_info(master->logger, "[cancel_query_in_exec] Solicitud de desalojo enviada al Worker ID=%d para Query ID=%d",
              target_worker->worker_id, qcb->query_id);
 
     // Marcar la query como CANCELED
@@ -237,4 +260,126 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
 
     // La respuesta del worker deberá ser manejada por handle_eviction_response cuando llegue
     return 0;
+}
+
+void finalize_query_with_error(t_query_control_block *qcb, t_master *master, const char *error_reason) {
+    if (!qcb || !master) return;
+
+    log_error(master->logger, "[finalize_query_with_error] Finalizing Query ID=%d with error: %s", qcb->query_id, error_reason ? error_reason : "Unknown reason");
+
+    // Preparar paquete para notificar QC: uso de opcode QC_OP_MASTER_FIN_DESCONEXION
+    t_package *pkg = package_create_empty(QC_OP_MASTER_FIN_DESCONEXION);
+    if (pkg) {
+        // Agregamos query_id y mensaje de error
+        package_add_uint32(pkg, (uint32_t)qcb->query_id);
+        if (error_reason) package_add_string(pkg, error_reason);
+
+        if (package_send(pkg, qcb->socket_fd) != 0) {
+            log_error(master->logger, "[finalize_query_with_error] Error sending finalization message to QC socket %d for Query ID=%d", qcb->socket_fd, qcb->query_id);
+        } else {
+            log_info(master->logger, "[finalize_query_with_error] Sent finalization notification to QC socket %d for Query ID=%d", qcb->socket_fd, qcb->query_id);
+        }
+        package_destroy(pkg);
+    } else {
+        log_error(master->logger, "[finalize_query_with_error] Could not create package to notify QC for Query ID=%d", qcb->query_id);
+    }
+
+    qcb->state = QUERY_STATE_CANCELED;
+}
+
+/**
+ * cleanup_query_resources
+ *  - Remueve la query de las estructuras internas (lists) y libera memoria asociada
+ *  - el caller posee el lock correspondiente
+ */
+void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
+    if (!qcb || !master) return;
+
+    log_debug(master->logger, "[cleanup_query_resources] Limpiando recursos para Query ID=%d", qcb->query_id);
+
+    // Remover de listas si están presentes (best-effort)
+    if (master->queries_table && master->queries_table->ready_queue) {
+        if (list_remove_element(master->queries_table->ready_queue, qcb)) {
+            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de ready_queue", qcb->query_id);
+        }
+    }
+    if (master->queries_table && master->queries_table->running_list) {
+        if (list_remove_element(master->queries_table->running_list, qcb)) {
+            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de running_list", qcb->query_id);
+        }
+    }
+    if (master->queries_table && master->queries_table->completed_list) {
+        if (list_remove_element(master->queries_table->completed_list, qcb)) {
+            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de completed_list", qcb->query_id);
+        }
+    }
+    if (master->queries_table && master->queries_table->canceled_list) {
+        if (!list_find(master->queries_table->canceled_list, (void*) qcb)) {
+            list_add(master->queries_table->canceled_list, qcb);
+        }
+    }
+
+    // Liberar campos dinámicos (si aplica)
+    if (qcb->query_file_path) {
+        free(qcb->query_file_path);
+        qcb->query_file_path = NULL;
+    }
+}
+
+/**
+ * cleanup_worker_resources
+ *  - Remueve el worker de las listas y libera memoria asociada
+ *  - Asume que caller posee el lock workers_table->worker_table_mutex
+ */
+void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master) {
+    if (!wcb || !master) return;
+
+    log_debug(master->logger, "[cleanup_worker_resources] Limpiando recursos para Worker ID=%d (socket=%d)", wcb->worker_id, wcb->socket_fd);
+
+
+    // Remover de listas
+    if (master->workers_table && master->workers_table->idle_list) {
+        list_remove_element(master->workers_table->idle_list, wcb);
+    }
+    if (master->workers_table && master->workers_table->busy_list) {
+        list_remove_element(master->workers_table->busy_list, wcb);
+    }
+    if (master->workers_table && master->workers_table->disconnected_list) {
+        if (!list_find(master->workers_table->disconnected_list, (void*) wcb)) {
+            list_add(master->workers_table->disconnected_list, wcb);
+        }
+    }
+
+    // Reset fields
+    wcb->current_query_id = -1;
+    wcb->socket_fd = -1;
+    wcb->state = WORKER_STATE_DISCONNECTED;
+
+    // Liberar memoria de strings si existen
+    if (wcb->ip_address) {
+        free(wcb->ip_address);
+        wcb->ip_address = NULL;
+    }
+}
+
+/**
+ * find_query_by_socket
+ */
+t_query_control_block *find_query_by_socket(t_query_table *table, int socket_fd) {
+    if (!table || !table->query_list)
+        return NULL;
+
+    search_query_socket_fd = socket_fd;
+    return (t_query_control_block *)list_find(table->query_list, match_query_by_socket);
+}
+
+/**
+ * find_worker_by_socket
+ */
+t_worker_control_block *find_worker_by_socket(t_worker_table *table, int socket_fd) {
+    if (!table || !table->worker_list)
+        return NULL;
+
+    search_worker_socket_fd = socket_fd;
+    return (t_worker_control_block *)list_find(table->worker_list, match_worker_by_socket);
 }
