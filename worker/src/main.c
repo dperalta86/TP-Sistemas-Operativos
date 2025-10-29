@@ -73,14 +73,11 @@ int main(int argc, char *argv[])
     log_info(logger, "## Worker iniciado - ID=%d", worker_id);
 
     /* Handshake con Storage y Master */
-    char worker_id_str[16];
-    sprintf(worker_id_str, "%d", worker_id);
-
     int socket_storage = handshake_with_storage(config->storage_ip, config->storage_port, worker_id);
     if (socket_storage < 0)
         goto cleanup;
 
-    int socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id_str);
+    int socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
     if (socket_master < 0)
         goto cleanup;
 
@@ -242,7 +239,7 @@ void *query_executor_thread(void *arg)
         if (state->should_stop && !state->has_query)
         {
             pthread_mutex_unlock(&state->mux);
-            break; 
+            break;
         }
 
         if (!state->has_query || state->should_stop)
@@ -338,4 +335,6 @@ void *query_executor_thread(void *arg)
         pthread_mutex_unlock(&state->mux);
         log_info(state->logger, "## Query %d: Abortada", ctx.query_id);
     }
+
+    return NULL;
 }

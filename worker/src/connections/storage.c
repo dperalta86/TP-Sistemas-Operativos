@@ -1,10 +1,10 @@
 #include "storage.h"
 #include <string.h>
 
-static int storage_request_response(int storage_socket,
-                                    t_package *request,
-                                    t_storage_op_code expected_response_code,
-                                    const char *operation_name, int worker_id)
+static int send_request_and_wait_ack(int storage_socket,
+                                     t_package *request,
+                                     t_storage_op_code expected_response_code,
+                                     const char *operation_name, int worker_id)
 {
     t_log *logger = logger_get();
 
@@ -46,14 +46,12 @@ int handshake_with_storage(const char *storage_ip,
                            const char *storage_port,
                            int worker_id)
 {
-    char worker_id_str[12];
-    sprintf(worker_id_str, "%d", worker_id);
-    
+
     return handshake_with_server("Storage",
                                  storage_ip, storage_port,
                                  STORAGE_OP_WORKER_SEND_ID_REQ,
                                  STORAGE_OP_WORKER_SEND_ID_RES,
-                                 worker_id_str);
+                                 worker_id);
 }
 
 int get_block_size(int storage_socket, uint16_t *block_size, int worker_id)
@@ -179,10 +177,10 @@ int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t 
     memcpy(*data, received_data, data_size);
     *size = data_size;
     package_destroy(response);
-    
-    log_debug(logger, "Lectura del bloque %u del archivo %s:%s realizada con éxito (%u bytes)", 
+
+    log_debug(logger, "Lectura del bloque %u del archivo %s:%s realizada con éxito (%u bytes)",
               block_number, file, tag, data_size);
-    
+
     return 0;
 }
 
@@ -196,9 +194,9 @@ int create_file_in_storage(int storage_socket, int worker_id, char *file, char *
         package_add_string(request, file) &&
         package_add_string(request, tag))
     {
-        return storage_request_response(storage_socket, request,
-                                        STORAGE_OP_FILE_CREATE_RES,
-                                        "creación de archivo", worker_id);
+        return send_request_and_wait_ack(storage_socket, request,
+                                         STORAGE_OP_FILE_CREATE_RES,
+                                         "creación de archivo", worker_id);
     }
 
     log_error(logger, "Error al preparar el paquete para crear archivo");
@@ -219,9 +217,9 @@ int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t s
         package_add_uint32(request, (uint32_t)size))
     {
 
-        int result = storage_request_response(storage_socket, request,
-                                              STORAGE_OP_FILE_TRUNCATE_RES,
-                                              "truncate de archivo", worker_id);
+        int result = send_request_and_wait_ack(storage_socket, request,
+                                               STORAGE_OP_FILE_TRUNCATE_RES,
+                                               "truncate de archivo", worker_id);
         if (result == 0)
         {
             log_debug(logger, "Truncate del archivo %s:%s a %zu bytes realizado con éxito", file, tag, size);
@@ -248,9 +246,9 @@ int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char
         package_add_string(request, tag_dst))
     {
 
-        int result = storage_request_response(storage_socket, request,
-                                              STORAGE_OP_TAG_CREATE_RES,
-                                              "fork (TAG) de archivo", worker_id);
+        int result = send_request_and_wait_ack(storage_socket, request,
+                                               STORAGE_OP_TAG_CREATE_RES,
+                                               "fork (TAG) de archivo", worker_id);
         if (result == 0)
         {
             // El log info de la instrucción (pedido en el enunciado) lo debería hacer el intreter.
@@ -276,9 +274,9 @@ int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker
         package_add_string(request, tag))
     {
 
-        int result = storage_request_response(storage_socket, request,
-                                              STORAGE_OP_TAG_COMMIT_RES,
-                                              "commit de archivo", worker_id);
+        int result = send_request_and_wait_ack(storage_socket, request,
+                                               STORAGE_OP_TAG_COMMIT_RES,
+                                               "commit de archivo", worker_id);
         if (result == 0)
         {
             // Idem log info de fork.
@@ -306,9 +304,9 @@ int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t b
         package_add_data(request, data, size))
     {
 
-        int result = storage_request_response(storage_socket, request,
-                                              STORAGE_OP_BLOCK_WRITE_RES,
-                                              "escritura de bloque", worker_id);
+        int result = send_request_and_wait_ack(storage_socket, request,
+                                               STORAGE_OP_BLOCK_WRITE_RES,
+                                               "escritura de bloque", worker_id);
         if (result == 0)
         {
             log_debug(logger, "Escritura del bloque %u del archivo %s:%s realizada con éxito", block_number, file, tag);
@@ -333,9 +331,9 @@ int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker
         package_add_string(request, tag))
     {
 
-        int result = storage_request_response(storage_socket, request,
-                                              STORAGE_OP_TAG_DELETE_RES,
-                                              "borrado de archivo", worker_id);
+        int result = send_request_and_wait_ack(storage_socket, request,
+                                               STORAGE_OP_TAG_DELETE_RES,
+                                               "borrado de archivo", worker_id);
         if (result == 0)
         {
             log_debug(logger, "Borrado del archivo %s:%s realizado con éxito", file, tag);

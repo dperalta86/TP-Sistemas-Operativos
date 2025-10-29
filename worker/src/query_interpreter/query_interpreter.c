@@ -258,7 +258,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
                 free(buffer);
                 return -1;
             }
-            int send_result = send_read_content_to_master(socket_master, buffer, instruction->read.size, query_id, worker_id);
+            int send_result = send_read_content_to_master(socket_master, query_id, buffer, instruction->read.size, worker_id);
             if (send_result != 0) {
                 free(buffer);
                 return -1;
@@ -273,7 +273,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, worker_id);
             break;
         case FLUSH: {
-            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
             if (page_table == NULL) {
                 return -1;
             }

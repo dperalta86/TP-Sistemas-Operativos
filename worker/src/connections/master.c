@@ -1,6 +1,6 @@
 #include "master.h"
 
-static int master_request_response(int master_socket,
+static int send_request_and_wait_ack(int master_socket,
                                    t_package *request,
                                    t_master_op_code expected_response_code,
                                    const char *operation_name)
@@ -43,7 +43,7 @@ static int master_request_response(int master_socket,
 
 int handshake_with_master(const char *master_ip,
                           const char *master_port,
-                          char *worker_id)
+                          int worker_id)
 {
     return handshake_with_server("Master",
                                  master_ip,
@@ -68,7 +68,7 @@ int end_query_in_master(int socket_master, int worker_id, int query_id)
         package_add_uint32(request, worker_id) &&
         package_add_uint32(request, query_id))
     {
-        int result = master_request_response(socket_master, request, 
+        int result = send_request_and_wait_ack(socket_master, request, 
                                             OP_WORKER_ACK, 
                                             "notificación de fin de query");
         if (result == 0)
@@ -83,7 +83,7 @@ int end_query_in_master(int socket_master, int worker_id, int query_id)
     return -1;
 }
 
-int send_read_content_to_master(int socket_master, void *data, size_t data_size, int query_id, int worker_id)
+int send_read_content_to_master(int socket_master, int query_id, void *data, size_t data_size, int worker_id)
 {
     t_log *logger = logger_get();
     if (socket_master < 0)

@@ -7,7 +7,7 @@ int handshake_with_server(const char *server_name,
                           const char *port,
                           uint8_t request_op,
                           uint8_t expected_response_op,
-                          char *worker_id)
+                          int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = NULL;
@@ -29,7 +29,7 @@ int handshake_with_server(const char *server_name,
         goto clean;
     }
 
-    if(!package_add_string(request, worker_id))
+    if(!package_add_uint32(request, worker_id))
     {
         log_error(logger, "## No se pudo agregar worker_id al package para %s", server_name);
         goto clean;
