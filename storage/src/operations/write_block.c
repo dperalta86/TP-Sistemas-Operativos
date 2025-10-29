@@ -29,7 +29,7 @@ t_package *handle_write_block_request(t_package *package) {
 
   if (!package_add_int8(response, (int8_t)operation_result)) {
     log_error(g_storage_logger,
-              "## Error al escribir status en respuesta de TRUNCATE_FILE");
+              "## Error al escribir status en respuesta de WRITE BLOCK");
     package_destroy(response);
     return NULL;
   }
@@ -145,7 +145,7 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
 
   size_t bytes_written = fwrite(block_content, sizeof(char),
                                 g_storage_config->block_size, block_file);
-  if (bytes_written != strlen(block_content)) {
+  if (bytes_written != g_storage_config->block_size) {
     log_error(g_storage_logger,
               "## Query ID: %d - Error al escribir en el bloque %s.", query_id,
               logical_block_path);
@@ -192,7 +192,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
     goto cleanup_metadata;
   }
 
-  if (block_number < 0 || (int)block_number >= metadata->block_count) {
+  if ((int)block_number >= metadata->block_count) {
     log_error(g_storage_logger,
               "## Query ID: %d - El bloque lógico %d no existe en %s:%s. Fuera "
               "de rango [0, %d]",
@@ -234,7 +234,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
                 "en el bitmap.",
                 query_id);
       retval = NOT_ENOUGH_SPACE;
-      goto cleanup_bitmap;
+      goto unlock_bitmap;
     }
 
     bitarray_set_bit(bitmap, (off_t)physical_block_index);
@@ -259,24 +259,27 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
       retval = -6;
       goto cleanup_metadata;
     }
-
-    destroy_file_metadata(metadata);
   }
+
+  destroy_file_metadata(metadata);
 
   if (write_to_logical_block(query_id, name, tag, block_number, block_content) <
       0) {
     retval = -7;
-    goto cleanup_unlock;
   }
 
-  unlock_file(name, tag);
+  goto cleanup_unlock;
 
-cleanup_bitmap:
-  free(bitmap_buffer);
-  bitarray_destroy(bitmap);
+unlock_bitmap:
   pthread_mutex_unlock(&g_storage_bitmap_mutex);
+cleanup_bitmap:
+  if (bitmap_buffer)
+    free(bitmap_buffer);
+  if (bitmap)
+    bitarray_destroy(bitmap);
 cleanup_metadata:
-  destroy_file_metadata(metadata);
+  if (metadata)
+    destroy_file_metadata(metadata);
 cleanup_unlock:
   unlock_file(name, tag);
 
