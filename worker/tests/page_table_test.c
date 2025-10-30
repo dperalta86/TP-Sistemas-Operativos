@@ -39,7 +39,7 @@ context(tests_page_table) {
             uint32_t page_count = 16;
             page_table_t *pt = pt_create(page_count, page_size);
 
-            pt_mark_dirty(pt, 5);
+            pt_set_dirty(pt, 5, true);
 
             should_bool(pt->entries[5].dirty) be equal to(true);
             pt_destroy(pt);
@@ -50,7 +50,7 @@ context(tests_page_table) {
             uint32_t invalid_index = 20;
             page_table_t *pt = pt_create(page_count, page_size);
 
-            pt_mark_dirty(pt, invalid_index);
+            pt_set_dirty(pt, invalid_index, true);
 
             for (uint32_t i = 0; i < page_count; i++) {
                 should_bool(pt->entries[i].dirty) be equal to(false);
@@ -63,9 +63,9 @@ context(tests_page_table) {
             size_t page_size = 256;
             uint32_t page_count = 16;
             page_table_t *pt = pt_create(page_count, page_size);
-            pt_mark_dirty(pt, 5);
+            pt_set_dirty(pt, 5, true);
 
-            pt_mark_clean(pt, 5);
+            pt_set_dirty(pt, 5, false);
 
             should_bool(pt->entries[5].dirty) be equal to(false);
             pt_destroy(pt);
@@ -75,9 +75,9 @@ context(tests_page_table) {
             uint32_t page_count = 16;
             uint32_t invalid_index = 20;
             page_table_t *pt = pt_create(page_count, page_size);
-            pt_mark_dirty(pt, 5);
+            pt_set_dirty(pt, 5, true);
 
-            pt_mark_clean(pt, invalid_index);
+            pt_set_dirty(pt, invalid_index, false);
 
             should_bool(pt->entries[5].dirty) be equal to(true);
             pt_destroy(pt);
@@ -88,9 +88,9 @@ context(tests_page_table) {
             size_t page_size = 256;
             uint32_t page_count = 16;
             page_table_t *pt = pt_create(page_count, page_size);
-            pt_mark_dirty(pt, 2);
-            pt_mark_dirty(pt, 5);
-            pt_mark_dirty(pt, 7);
+            pt_set_dirty(pt, 2, true);
+            pt_set_dirty(pt, 5, true);
+            pt_set_dirty(pt, 7, true);
 
             size_t dirty_count = 0;
             pt_entry_t *dirty_entries = pt_get_dirty_entries(pt, &dirty_count);

@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     memory_manager_t *mm = mm_create(
         config->memory_size,
         config->block_size,
-        (pt_replacement_t)config->replacement_algorithm);
+        (pt_replacement_t)config->replacement_algorithm, config->memory_retardation);
 
     if (!mm)
     {
