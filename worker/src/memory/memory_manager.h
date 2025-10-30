@@ -44,13 +44,14 @@ typedef struct
     int memory_retardation;
     int storage_socket;
     int worker_id;
-
+    int query_id;
     frame_table_t frame_table;
 } memory_manager_t;
 
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy, int retardation_ms);
 void mm_destroy(memory_manager_t *mm);
 void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int worker_id);
+void mm_set_query_id(memory_manager_t *mm, int query_id);
 
 page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag);
 page_table_t *mm_create_page_table(memory_manager_t *mm, char *file, char *tag);

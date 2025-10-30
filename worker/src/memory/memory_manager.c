@@ -1,5 +1,6 @@
 #include "memory_manager.h"
 #include "../connections/storage.h"
+#include <utils/logger.h>
 
 static void mm_resize_entries(memory_manager_t *mm)
 {
@@ -32,6 +33,7 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     mm->entries = NULL;
     mm->storage_socket = -1;
     mm->worker_id = -1;
+    mm->query_id = -1;
 
     mm->physical_memory = malloc(memory_size);
     if (!mm->physical_memory)
@@ -57,9 +59,17 @@ void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int wor
 {
     if (!mm)
         return;
-    
+
     mm->storage_socket = storage_socket;
     mm->worker_id = worker_id;
+}
+
+void mm_set_query_id(memory_manager_t *mm, int query_id)
+{
+    if (!mm)
+        return;
+
+    mm->query_id = query_id;
 }
 
 void mm_destroy(memory_manager_t *mm)
@@ -162,11 +172,11 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
         return -1;
 
     uint32_t block_number = page_number;
-    
+
     void *data = NULL;
     size_t size = 0;
     int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->worker_id);
-    
+
     if (result != 0 || !data)
     {
         mm_free_frame(mm, frame);
@@ -184,7 +194,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     memset(frame_addr, 0, mm->page_size);
     size_t copy_size = (size < mm->page_size) ? size : mm->page_size;
     memcpy(frame_addr, data, copy_size);
-    
+
     free(data);
 
     if (pt_map(pt, page_number, frame) != 0)
@@ -286,6 +296,8 @@ int mm_allocate_frame(memory_manager_t *mm)
     }
 
     // TODO: aplicar algoritmo de reemplazo (LRU / CLOCK-M)
+    log_info(logger_get(), "## Query %d: - Memoria Llena - No hay marcos disponibles (Frame Count: %d)",
+             mm->query_id, mm->frame_table.frame_count);
     return -1;
 }
 

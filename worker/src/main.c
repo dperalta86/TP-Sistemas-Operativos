@@ -92,7 +92,6 @@ int main(int argc, char *argv[])
     config->block_size = block_size;
     log_info(logger, "## Tamaño de bloque recibido: %d", config->block_size);
 
-    /* Crear memoria interna */
     memory_manager_t *mm = mm_create(
         config->memory_size,
         config->block_size,
@@ -106,6 +105,8 @@ int main(int argc, char *argv[])
 
     log_info(logger, "## Memoria interna creada - tamaño: %d - tamaño de pagina: %d - politica de reemplazo: %s",
              config->memory_size, config->block_size, config->replacement_algorithm);
+
+    mm_set_storage_connection(mm, socket_storage, worker_id);
 
     /* Crear estado global */
     worker_state_t state = {
@@ -186,6 +187,9 @@ void *master_listener_thread(void *arg)
             state->current_query.query_id = query_id;
             state->has_query = true;
             state->should_stop = false;
+            
+            mm_set_query_id(state->memory_manager, query_id);
+            
             pthread_mutex_unlock(&state->mux);
 
             log_info(logger, "## Se asignó Query %d - Program Counter=%d - Ruta=%s", query_id, pc, path);
