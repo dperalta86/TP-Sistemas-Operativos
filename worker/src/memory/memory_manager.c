@@ -224,7 +224,7 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
                 return -1;
         }
 
-        void *frame_addr = mm_get_frame_address(mm, entry->frame);
+        void *frame_addr = mm_allocate_frame(mm, entry->frame);
         size_t bytes_to_copy = page_size - offset;
         if (bytes_to_copy > remaining)
             bytes_to_copy = remaining;
@@ -269,22 +269,6 @@ pt_entry_t *mm_get_dirty_pages(memory_manager_t *mm, char *file, char *tag, size
     }
 
     return pt_get_dirty_entries(pt, count);
-}
-
-int mm_get_free_frame(memory_manager_t *mm)
-{
-    if (!mm)
-        return -1;
-
-    for (uint32_t i = 0; i < mm->frame_table.frame_count; i++)
-    {
-        if (!mm->frame_table.frames[i].used)
-        {
-            mm->frame_table.frames[i].used = true;
-            return i;
-        }
-    }
-    return -1;
 }
 
 int mm_allocate_frame(memory_manager_t *mm)
