@@ -92,11 +92,15 @@ int deserialize_block_write_request(t_package *package, uint32_t *query_id,
   return retval;
 
 clean_tag:
-  if (*tag)
+  if (*tag) {
     free(*tag);
+    *tag = NULL;
+  }
 clean_name:
-  if (*name)
+  if (*name) {
     free(*name);
+    *name = NULL;
+  }
 end:
   return retval;
 }
