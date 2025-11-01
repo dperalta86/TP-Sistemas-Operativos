@@ -85,4 +85,59 @@ context(tests_write_block) {
             should_int(retval) be equal to (-1);
         } end
     } end
+
+    describe("Escritura en bloque físico") {
+        before {
+            create_test_directory();
+            create_test_storage_config("9090", "99", "false", TEST_MOUNT_POINT, 1000, 1000, "INFO");
+            create_test_superblock(TEST_MOUNT_POINT);
+
+            char config_path[PATH_MAX];
+            snprintf(config_path, sizeof(config_path), "%s/storage.config", TEST_MOUNT_POINT);
+            g_storage_config = create_storage_config(config_path);
+
+            init_physical_blocks(TEST_MOUNT_POINT, g_storage_config->fs_size, g_storage_config->block_size);
+            init_logical_blocks("file1", "tag1", 20, TEST_MOUNT_POINT);
+        } end
+
+        after {
+            destroy_storage_config(g_storage_config);
+            cleanup_test_directory();
+        } end
+
+        it ("Escribe en bloque físico exitosamente") {
+            int retval = write_to_logical_block(12, "file1", "tag1", 3, "CONTENIDO");
+            should_int(retval) be equal to (0);
+        } end
+
+        it ("No halla el archivo de bloque lógico") {
+            int retval = write_to_logical_block(12, "file1", "tag1", 93, "CONTENIDO");
+            should_int(retval) be equal to (-1);
+        } end
+    } end
+
+    describe ("Lógica central de escritura en archivo") {
+        before {
+            create_test_directory();
+            create_test_storage_config("9090", "99", "false", TEST_MOUNT_POINT, 1000, 1000, "INFO");
+            create_test_superblock(TEST_MOUNT_POINT);
+
+            char config_path[PATH_MAX];
+            snprintf(config_path, sizeof(config_path), "%s/storage.config", TEST_MOUNT_POINT);
+            g_storage_config = create_storage_config(config_path);
+        } end
+
+        after {
+            printf("???");
+            destroy_storage_config(g_storage_config);
+            cleanup_test_directory();
+        } end
+
+        it ("El file:tag no existe") {
+            printf("si entra");
+            int retval = execute_block_write("file1", "tag1", 12, 3, "CONTENIDO");
+            should_int(retval) be equal to (FILE_TAG_MISSING);
+            //should_bool(correct_unlock("file1", "tag1")) be truthy;
+        } end
+    } end
 } 
