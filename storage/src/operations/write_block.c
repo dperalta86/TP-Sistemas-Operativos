@@ -187,7 +187,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
     goto cleanup_unlock;
   }
 
-  if (strcmp(metadata->state, COMMITTED) == 0) {
+  if (strcmp(metadata->state, COMMITED) == 0) {
     log_error(g_storage_logger,
               "## Query ID: %d - El archivo %s:%s ya está en estado "
               "'COMMITTED' y no puede ser escrito.",

@@ -12,7 +12,7 @@
 #include "errors.h"
 
 #define IN_PROGRESS "WORK_IN_PROGRESS"
-#define COMMITTED "COMMITTED"
+#define COMMITED "COMMITED"
 
 /**
  * Maneja la solicitud de operación WRITE BLOCK recibida desde un Worker.
