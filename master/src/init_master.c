@@ -98,6 +98,10 @@ void destroy_master(t_master *master) {
         if (master->queries_table != NULL) {
             free(master->queries_table);
         }
+        if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+            pthread_join(master->aging_thread, NULL);
+            log_info(master->logger, "Aging thread finalizado correctamente.");
+        }
         free(master);
     }
 }
