@@ -84,6 +84,20 @@ int manage_query_handshake(int client_socket, t_log *logger);
  * 
  * Luego de crear la estructura, la agrega a la tabla de queries y a la cola de ready.
  */
-t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int socket_fd);
+t_query_control_block *create_query(t_master *master, int query_id, char *query_file_path, int priority, int socket_fd);
+
+/**
+ * @brief Inserta una query en la cola de ready respetando el orden por prioridad.
+ *
+ * Esta función recorre la cola de ready (`ready_queue`) y ubica la nueva query (`new_qcb`)
+ * en la posición correspondiente según su prioridad. Las prioridades más bajas indican
+ * mayor prioridad de ejecución. Si no hay ninguna query con menor prioridad, se agrega al final.
+ *
+ * @param ready_queue Puntero a la lista de queries en estado READY.
+ * @param new_qcb Puntero al bloque de control de la nueva query a insertar.
+ * @return int Devuelve 0 en caso de éxito, o -1 si ocurre un error (por ejemplo, parámetros nulos).
+ */
+int insert_query_by_priority(t_list *ready_queue, t_query_control_block *new_qcb);
+
 
 #endif // QUERY_CONTROL_MANAGER_H

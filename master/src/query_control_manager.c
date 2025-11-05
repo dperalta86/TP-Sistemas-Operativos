@@ -47,7 +47,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, multiprocessing_level);
     
     // Agregar a la tabla de queries
-    t_query_control_block *qcb = create_query(master->queries_table, assigned_id, query_path, query_priority, client_socket);
+    t_query_control_block *qcb = create_query(master, assigned_id, query_path, query_priority, client_socket);
     if(!qcb)
     {
         log_error(master->logger, "Error al crear el control block para Query ID: %d", assigned_id);
@@ -74,9 +74,9 @@ int generate_query_id(t_master *master) {
     return ++(master->queries_table->next_query_id);
 }
 
-t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int socket_fd) {
+t_query_control_block *create_query(t_master *master, int query_id, char *query_file_path, int priority, int socket_fd) {
     // loqueamos la tabla para manipular datos administrativos
-    pthread_mutex_lock(&table->query_table_mutex);
+    pthread_mutex_lock(&master->queries_table->query_table_mutex);
 
     t_query_control_block *qcb = malloc(sizeof(t_query_control_block));
     qcb->socket_fd = socket_fd;
@@ -88,11 +88,41 @@ t_query_control_block *create_query(t_query_table *table, int query_id, char *qu
     qcb->program_counter = 0; // Inicia en 0, luego lo actualiza con datos desde el Worker
     qcb->state = QUERY_STATE_READY; // Inicia en READY al ser creada
 
-    // Agregamos a la lista principal y a la cola de ready
-    list_add(table->query_list, qcb);
-    list_add(table->ready_queue, qcb);
-    table->total_queries++;
+    // Agregamos a la lista principal y a la cola de ready (teniendo en cuenta planificador)
+    list_add(master->queries_table->query_list, qcb);
 
-    pthread_mutex_unlock(&table->query_table_mutex);
+    if (strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+        if(insert_query_by_priority(master->queries_table->ready_queue, qcb) != 0)
+            log_error(master->logger, "Error al intentar insertar query (query ID: %d) en Ready Queue.", query_id);
+    } else {
+        list_add(master->queries_table->ready_queue, qcb);
+    }
+
+    master->queries_table->total_queries++;
+
+    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
     return qcb;
 }
+
+int insert_query_by_priority(t_list *ready_queue, t_query_control_block *new_qcb) {
+    if (ready_queue == NULL || new_qcb == NULL) {
+        return -1; // Error por parámetros inválidos
+    }
+
+    for (int i = 0; i < list_size(ready_queue); i++) {
+        t_query_control_block *existing_qcb = list_get(ready_queue, i);
+        if (existing_qcb == NULL) {
+            return -1; // Error inesperado en la lista
+        }
+
+        if (new_qcb->priority < existing_qcb->priority) {
+            list_add_in_index(ready_queue, i, new_qcb);
+            return 0; // Éxito
+        }
+    }
+
+    // Si recorro la lista completa y todas las queries tienen mayor prioridad
+    list_add(ready_queue, new_qcb);
+    return 0; // Éxito
+}
+
