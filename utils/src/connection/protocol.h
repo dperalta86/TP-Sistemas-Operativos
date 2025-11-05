@@ -17,6 +17,7 @@ typedef enum {
     OP_WORKER_START_QUERY,
     OP_WORKER_READ_MESSAGE_REQ,
     OP_WORKER_END_QUERY,
+    OP_WORKER_PREEMPT_REQ
 } t_master_op_code;
 
 typedef enum {

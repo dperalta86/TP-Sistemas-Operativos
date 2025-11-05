@@ -31,6 +31,7 @@ typedef struct {
     char *query_file_path;
     int priority;
     int initial_priority;
+    uint64_t ready_timestamp;
     int assigned_worker_id;
     int program_counter;
     t_query_state state;
@@ -85,5 +86,7 @@ int manage_query_handshake(int client_socket, t_log *logger);
  * Luego de crear la estructura, la agrega a la tabla de queries y a la cola de ready.
  */
 t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int socket_fd);
+
+uint64_t now_ms_monotonic();
 
 #endif // QUERY_CONTROL_MANAGER_H

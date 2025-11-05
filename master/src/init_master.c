@@ -2,6 +2,7 @@
 #include "init_master.h"
 #include "query_control_manager.h"
 #include "worker_manager.h"
+#include "aging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,7 +53,12 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
         log_error(logger, "No se pudo asignar memoria para el puerto del Master");
         goto error;
     }
+
+    // Aging
     master->aging_interval = aging_interval;
+    pthread_create(&master->aging_thread, NULL, aging_thread_func, master);
+
+    // Planificador
     master->scheduling_algorithm = strdup(scheduling_algorithm);
     if (master->scheduling_algorithm == NULL) {
         log_error(logger, "No se pudo asignar memoria para el algoritmo de planificación");
