@@ -69,9 +69,8 @@ void *aging_thread_func(void *arg) {
                 qcb->ready_timestamp += (uint64_t)intervals * (uint64_t)master->aging_interval;
 
                 log_info(master->logger,
-                         "[Aging] Query ID=%d envejeció %u pasos: %u -> %u (ready_since=%llu ms)",
-                         qcb->query_id, decrements, original_priority, qcb->priority,
-                         (unsigned long long)qcb->ready_timestamp);
+                         "##<QUERY_ID: %d> Cambio de prioridad: <PRIORIDAD_ANTERIOR: %d> - <PRIORIDAD_NUEVA: %d>",
+                         qcb->query_id, original_priority, qcb->priority);
             }
         }
 
@@ -119,12 +118,6 @@ void check_preemption(t_master *master) {
     }
 
     // Desalojar...
-    log_info(master->logger,
-             "[Preemption] Desalojando Query ID=%d (priority=%d) "
-             "porque llegó Query ID=%d (priority=%d)",
-             worst_running->query_id, worst_running->priority,
-             best_ready->query_id, best_ready->priority);
-
     preempt_query_in_exec(worst_running, master);
 
 unlock_and_exit:
@@ -135,11 +128,6 @@ unlock_and_exit:
 
 int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return -1;
-
-    log_info(master->logger,
-        "[preempt_query_in_exec] Desalojando Query ID=%d por preemption (volverá a READY)",
-        qcb->query_id
-    );
 
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
         log_error(master->logger, "[preempt_query_in_exec] No se pudo lockear workers_table");
@@ -172,6 +160,11 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     package_add_uint32(pkg, (uint32_t)qcb->query_id);
     package_send(pkg, worker->socket_fd);
     package_destroy(pkg);
+
+    log_info(master->logger,
+        "## Se desaloja la Query id: %d (<PRIORIDAD: %d>) del Worker <WORKER_ID: %d> - Motivo: <PRIORIDAD>",
+        qcb->query_id, qcb->priority, worker->worker_id
+    );
 
     pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
