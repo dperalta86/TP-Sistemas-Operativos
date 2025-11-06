@@ -154,9 +154,9 @@ context(tests_write_block) {
             should_bool(correct_unlock("file1", "tag1")) be truthy;
         } end
 
-        it ("file:tag ya estaba en estado COMMITED") {
+        it ("file:tag ya estaba en estado COMMITTED") {
             init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
-            create_test_metadata("file1", "tag1", 3, "[1,2,3]", "COMMITED", TEST_MOUNT_POINT);
+            create_test_metadata("file1", "tag1", 3, "[1,2,3]", "COMMITTED", TEST_MOUNT_POINT);
 
             int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
 

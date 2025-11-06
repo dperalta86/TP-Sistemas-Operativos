@@ -158,7 +158,7 @@ int init_logical_blocks(const char *name, const char *tag, int numb_blocks, cons
  * @param tag Etiqueta asociada al archivo.
  * @param numb_blocks Número de bloques que debe contener el archivo.
  * @param blocks_array_str Array de IDs de bloques (ej: "[1,2,3,4]").
- * @param status Estado del archivo: "WORK_IN_PROGRESS" o "COMMITED".
+ * @param status Estado del archivo: "WORK_IN_PROGRESS" o "COMMITTED".
  * @param mount_point Punto de montaje base.
  * @return int 0 si el archivo de metadatos se creó exitosamente.
  * @return int -1 si el número de bloques solicitado excede el tamaño del FS de prueba (TEST_FS_SIZE).
