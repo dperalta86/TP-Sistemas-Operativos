@@ -107,7 +107,7 @@ end:
   return retval;
 }
 
-int create_new_hardlink(uint32_t query_id, char *logical_block_path,
+int create_new_hardlink(uint32_t query_id, const char *name, const char *tag, uint32_t logical_block, char *logical_block_path,
                         ssize_t physical_block_index) {
 
   size_t bitmap_bits = g_storage_config->bitmap_size_bytes * 8;
@@ -129,6 +129,8 @@ int create_new_hardlink(uint32_t query_id, char *logical_block_path,
               query_id, physical_block_path, logical_block_path);
     return -1;
   }
+
+  log_info(g_storage_logger, "## Query ID: %" PRIu32 " - %s:%s - Se agregó el hardlink del bloque lógico %" PRIu32 " al bloque físico %zd", query_id, name, tag, logical_block, physical_block_index);
 
   return 0;
 }
@@ -158,6 +160,8 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
     fclose(block_file);
     return -1;
   }
+
+  log_info(g_storage_logger, "## Query ID: %" PRIu32 " - Bloque lógico escrito %s:%s - Número de bloque: %" PRIu32, query_id, file_name, tag, block_number);
 
   fclose(block_file);
   return 0;
@@ -250,7 +254,9 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
       goto cleanup_bitmap;
     }
 
-    if (create_new_hardlink(query_id, logical_block_path,
+    log_info(g_storage_logger, "Query ID: %" PRIu32 " - Bloque físico reservado - Número de bloque: %zd", query_id, physical_block_index);
+
+    if (create_new_hardlink(query_id, name, tag, block_number, logical_block_path,
                             physical_block_index) < 0) {
       retval = -5;
       goto cleanup_metadata;

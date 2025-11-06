@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <commons/bitarray.h>
+#include <inttypes.h>
 #include "connection/serialization.h"
 #include "connection/protocol.h"
 #include "globals/globals.h"
@@ -58,11 +59,14 @@ int write_to_logical_block(uint32_t query_id, const char *file_name, const char 
  * Crea un nuevo hardlink (en la ruta lógica) que apunta a un bloque físico.
  * 
  * @param query_id ID de la Query para logging.
+ * @param name Nombre de archivo.
+ * @param tag Tag de archivo.
+ * @param logical_block Número de bloque lógico.
  * @param logical_block_path Ruta donde se creará el nuevo hardlink lógico.
  * @param bit_index Índice del bit (número de bloque físico) asignado.
  * @return int 0 si el hardlink se creó correctamente, -1 en caso de fallo.
  */
-int create_new_hardlink(uint32_t query_id, char *logical_block_path, ssize_t bit_index);
+int create_new_hardlink(uint32_t query_id, const char *name, const char *tag, uint32_t logical_block, char *logical_block_path, ssize_t bit_index);
 
 /**
  * Deserializa los datos necesarios para la operación WRITE BLOCK.
