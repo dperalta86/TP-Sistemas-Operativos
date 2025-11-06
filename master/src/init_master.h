@@ -40,6 +40,8 @@ typedef struct master {
     pthread_t scheduling_thread; // Hilo de planificación
     pthread_t health_check_thread; // Hilo de chequeo de salud de workers y queries
 
+    bool running; // para safe shutdown
+
     // Logger
     t_log *logger;
 } t_master;

@@ -9,7 +9,7 @@ static int search_worker_id = -1;
 void *aging_thread_func(void *arg) {
     t_master *master = (t_master*) arg;
 
-    while (1) {
+    while (master->running) {
         // Definir cada cuanto se hace la verificación, un tiempo fijo (100ms, 250ms)
         // o una fracción del aging interval (10 veces cada intervalo)
         usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
@@ -52,10 +52,10 @@ void *aging_thread_func(void *arg) {
 
             // Esta verificación es por si tenemos tiempo fijo y "se pasa" de un intervalo
             // NO DEBERÍA PASAR...
-            uint64_t intervals = elapsed / (uint64_t)master->aging_interval;
+            int intervals = elapsed / master->aging_interval;
             // Aplicar hasta que prioridad llegue a 0
-            uint32_t decrements = (uint32_t) intervals;
-            uint32_t original_priority = qcb->priority;
+            int decrements = intervals;
+            int original_priority = qcb->priority;
 
             if (decrements > 0 && qcb->priority > 0) {
                 if (decrements >= qcb->priority) {
