@@ -1,0 +1,8 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -g \
+	-I../../src \
+	-I../../../utils/src \
+	-I../../../utils/src/connection \
+	-I../unity/src
+
+LIBS = -lcommons -lpthread -lcrypto

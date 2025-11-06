@@ -1,24 +1,26 @@
-#include <init_master.h>
-#include <pthread.h>
-#include <managers/query_control_manager.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <managers/worker_manager.h>
+#include <utils/server.h>
+#include <utils/utils.h>
+#include <commons/config.h>
 #include <commons/log.h>
-#include <config/master_config.h>
 #include <linux/limits.h>
 #include <sys/socket.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <stdlib.h>
 
-#include "connection/protocol.h"
-#include "connection/serialization.h"
-#include "utils/server.h"
-#include "utils/utils.h"
+#include <init_master.h>
+#include <connection/protocol.h>
+#include <connection/serialization.h>
+#include <query_control_manager.h>
+#include <worker_manager.h>
+#include <config/master_config.h>
+#include <aging.h>
 
 #define MODULO "MASTER"
 #define LOG_LEVEL LOG_LEVEL_DEBUG //inicialmente DEBUG, luego se setea desde el config
 
 void* handle_client(void* arg);
-void main_loop(t_master *master);
 
 typedef struct {
     int client_socket;
@@ -26,34 +28,30 @@ typedef struct {
 } t_client_data;
 
 int main(int argc, char* argv[]) {
-    // Inicialización de variables para cleanup seguro
-    t_log* logger = NULL;
-    t_master_config *master_config = NULL;
-    t_master *master = NULL;
-    int server_socket_fd = -1;
-
     // Verifico que se hayan pasado los parametros correctamente
     if (argc != 2) 
     {
         printf("[ERROR]: Se esperaban ruta al archivo de configuracion\nUso: %s [archivo_config]\n", argv[0]);
-        goto cleanup;
+        goto error;
     }
+
     // Obtengo el directorio actual
     char current_directory[PATH_MAX];
     if (getcwd(current_directory, sizeof(current_directory)) == NULL) 
     {
         fprintf(stderr, "Error al obtener el directorio actual\n");
-        goto cleanup;
+        goto error;
     }
+    
     // Inicializo el logger
     t_log_level log_level = LOG_LEVEL;
     t_log* logger = create_logger(current_directory, MODULO, true, log_level);
     if (logger == NULL) 
     {
         fprintf(stderr, "Error al crear el logger\n");
-        goto cleanup;
+        goto error;
     }
-    // Cargo path de query desde argumento
+
     char* path_config_file = argv[1];
 
     // Cargo el archivo de configuracion 
@@ -61,7 +59,7 @@ int main(int argc, char* argv[]) {
     if (!master_config)
     {
         log_error(logger, "Error al leer el archivo de configuracion %s\n", path_config_file);
-        goto cleanup;
+        goto clean;
     }
 
     // Seteo el nivel de logeo desde el config
@@ -72,81 +70,57 @@ int main(int argc, char* argv[]) {
 
     // Inicializo la estructura principal del Master (tablas, datos de config, hilos, etc.)
     t_master *master = init_master(master_config->ip, master_config->port, master_config->aging_time, master_config->scheduler_algorithm, logger);
-
-    // Inicializo semaforo para control de hilos
-    if (sem_init(&master->client_threads_sem, 0, MAX_CONCURRENT_CLIENTS) != 0) {
-        log_error(logger, "Error inicializando semáforo de threads: %s", strerror(errno));
-        retval = ERROR_MASTER_INIT;
-        goto cleanup;
-    }
-
+    
     // Destruyo master_config
     destroy_master_config_instance(master_config);
     master_config = NULL;
     
     // Inicio el servidor
     int server_socket_fd = start_server(master->ip, master->port);
-    if (server_socket_fd < 0)
+
+    // Inicio hilo aging (si estoy en priotidad)
+    if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+        pthread_create(&master->aging_thread, NULL, aging_thread_func, master);
+        log_info(master->logger, "Aging habilitado (scheduler PRIORITY)");
+    } else {
+        log_info(master->logger, "Aging deshabilitado (scheduler FIFO)");
+    }
+
+    if (server_socket_fd < 0) 
     {
-        const char *error = start_server_error_string(server_socket_fd);
-        log_error(master->logger, "Error al iniciar el servidor en %s:%s.\n%s", master->ip, master->port, error);
+        log_error(logger, "Error al iniciar el servidor en %s:%s", master->ip, master->port);
         goto clean;
     }
-    master->server_fd = server_socket_fd;
-    server_socket_fd = -1 // No puedo liberar un entero, pero la responsabilidad del fd ya es de master...
-    log_info(master->logger, "Servidor iniciado exitosamente en %s:%s (socket fd: %d)",
-         master->ip, master->port, master->server_fd);
+
+    log_info(logger, "Socket %d creado con exito!", server_socket_fd);
 
     // Bucle principal para aceptar conexiones entrantes
-    main_loop(master);
-
-    return 0;
-
-cleanup:
-    if (server_socket_fd != -1) {
-        close(server_socket_fd);
-    }
-
-if (master) {
-    destroy_master(master);
-}
-
-if (logger) {
-    log_info(logger, "Cleanup completado. Cerrando logger...");
-    log_destroy(logger);
-}
-
-return EXIT_FAILURE;
-}
-
-void main_loop(t_master *master)
-{
     while (1) {
         struct sockaddr client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
 
-        int client_socket_fd = accept(master->server_fd, &client_addr, &client_addr_len);
-        if (client_socket_fd < 0)
+        int client_socket_fd = accept(server_socket_fd, &client_addr, &client_addr_len);
+        if (client_socket_fd < 0) 
         {
-            log_error(master->logger, "Error al aceptar conexion del cliente");
+            log_error(logger, "Error al aceptar conexion del cliente");
             continue;
         }
 
-        log_info(master->logger, "Cliente conectado en socket %d", client_socket_fd);
+        log_info(logger, "Cliente conectado en socket %d", client_socket_fd);
 
         t_client_data *client_data = malloc(sizeof(t_client_data));
         if (client_data == NULL) {
-            log_error(master->logger, "Error al asignar memoria para datos del cliente");
+            log_error(logger, "Error al asignar memoria para datos del cliente");
             close(client_socket_fd);
             continue;
-        }
+        }  
         client_data->client_socket = client_socket_fd;
         client_data->master = master;
 
 
         pthread_t client_thread;
         if (pthread_create(&client_thread, NULL, handle_client, client_data) != 0) {
-            log_error(master->logger, "Error al crear hilo para cliente %d", client_socket_fd);
+            log_error(logger, "Error al crear hilo para cliente %d", client_socket_fd);
             close(client_socket_fd);
             free(client_data);
             continue;
@@ -155,25 +129,43 @@ void main_loop(t_master *master)
         pthread_detach(client_thread);
     }
 
-    return;
+clean:
+    if (master) destroy_master(master);
+    if (master_config) destroy_master_config_instance(master_config);
+    if (logger) log_destroy(logger);
+    return 1;
+error:
+    return -1;
+
+    return 0;
 }
 
 void* handle_client(void* arg) {
     t_client_data *client_data = (t_client_data*)arg;
     int client_socket = client_data->client_socket;
     t_master *master = client_data->master;
+    // Variables para identificar tipo de cliente y manejar desconexiones
+    bool is_query_control = false;
+    bool is_worker = false;
 
     while (1) {
         t_package *required_package = package_receive(client_socket);
 
-        if (required_package <0) {
+        if (required_package == NULL) {
             log_error(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
-            break; // Sale del bucle y cierra la conexión
-        }
-
-        if (required_package == 0) {
-            log_debug(master->logger, "Cliente %d finalza comunicación, se cierra conexión y liberan recursos.", client_socket);
-            break; // Sale del bucle y cierra la conexión
+            
+            // Manejar desconexión según tipo de cliente identificado
+            if (is_query_control) {
+                handle_query_control_disconnection(client_socket, master);
+            } else if (is_worker) {
+                handle_worker_disconnection(client_socket, master);
+            } else {
+                // Cliente no identificado, solo cerrar socket
+                log_warning(master->logger, "Cliente no identificado en socket %d se desconectó", client_socket);
+                close(client_socket);
+            }
+            
+            break; // Sale del bucle y termina el hilo
         }
 
         switch (required_package->operation_code)
@@ -190,22 +182,44 @@ void* handle_client(void* arg) {
                     log_error(master->logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
                 }
                 break;
-            
+            case QC_OP_DISCONNECTION:
+                log_info(master->logger, "Recibido QC_OP_DISCONNECTION de socket %d", client_socket);
+                handle_query_control_disconnection(client_socket, master);
+                break;
+                
             // Worker
-                case OP_WORKER_HANDSHAKE_REQ:
+            case OP_WORKER_HANDSHAKE_REQ:
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
-                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
+                    log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
                 }              
+                break;
+            case OP_WORKER_READ_MESSAGE_REQ:
+                log_debug(master->logger, "Recibido OP_WORKER_READ_MESSAGE de socket %d", client_socket);
+                if (manage_read_message_from_worker(required_package->buffer, client_socket, master) != 0) {
+                    log_error(master->logger, "Error al manejar OP_WORKER_READ_MESSAGE del cliente %d", client_socket);
+                }
+                break;
+            case WORKER_OP_DISCONNECTION:
+                log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);
+                handle_worker_disconnection(client_socket, master);
                 break;
             default:
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);
                 break;
         }
-        package_destroy(required_package); // Libera el paquete recibido
+        if(required_package)
+        {
+            package_destroy(required_package); // Libera el paquete recibido
+        }
+            
     }
 
     close(client_socket);
-    free(client_data);
+    if(client_data)
+    {
+        free(client_data);
+    }
+        
     return NULL;
 }

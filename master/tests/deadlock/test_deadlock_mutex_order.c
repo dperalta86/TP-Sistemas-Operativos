@@ -1,58 +1,99 @@
 #include "unity.h"
 #include <unistd.h>
+
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include "../../src/init_master.h"
+#include "../../src/query_control_manager.h"
+#include "../../src/worker_manager.h"
 #include <commons/collections/list.h>
-#include <commons/log.h>
-#include "../src/init_master.h"
-#include "../src/query_control_manager.h"
-#include "../src/scheduler.h"
-#include "../src/aging.h"
+
+#define CANTIDAD_ITERACIONES 10
+#define INTERVALO_CREACION_US 200000 // 200ms
+#define INTERVALO_REORDENAMIENTO_US 250000 // 250ms
 
 void setUp(void) {}
 void tearDown(void) {}
+void destroy_fake_master(t_master *master);
 t_master* init_fake_master();
-void destroy_fake_master(t_master*);
 
-void test_aging_increases_priority_after_interval(void) {
-    t_master* fake_master = init_fake_master();
-    fake_master->running = true;
-        
-    if(strcmp(fake_master->scheduling_algorithm, "PRIORITY") == 0) {
-        pthread_create(&fake_master->aging_thread, NULL, aging_thread_func, fake_master);
-        log_info(fake_master->logger, "Aging habilitado (scheduler PRIORITY)");
-    } else {
-        log_info(fake_master->logger, "Aging deshabilitado (scheduler FIFO)");
+volatile bool carga_finalizada = false;
+volatile bool reordenamiento_finalizado = false;
+
+bool comparador_prioridad(void* a, void* b) {
+    t_query_control_block* q1 = (t_query_control_block*)a;
+    t_query_control_block* q2 = (t_query_control_block*)b;
+    return q1->priority - q2->priority;
+}
+
+void* hilo_carga_queries(void* arg) {
+    t_master* master = (t_master*)arg;
+
+    for (int i = 0; i < CANTIDAD_ITERACIONES; i++) {
+        t_query_control_block* qcb = malloc(sizeof(t_query_control_block));
+        qcb->query_id = i;
+        qcb->priority = 18 - (i % 3); // prioridad variable
+
+        pthread_mutex_lock(&master->queries_table->query_table_mutex);
+        list_add(master->queries_table->ready_queue, qcb);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+
+        usleep(INTERVALO_CREACION_US);
     }
 
-    t_query_control_block* qcb = malloc(sizeof(t_query_control_block));
-    qcb->query_id = 1;
-    qcb->priority = 3;
-    qcb->state = QUERY_STATE_READY;
-    qcb->ready_timestamp = now_ms_monotonic();
-    list_add(fake_master->queries_table->ready_queue, qcb);
-
-    usleep(600 * 1000); // esperar un poco más que el aging_interval
-
-    // Chequeo esperado: prioridad debe disminuir a 2
-    TEST_ASSERT_EQUAL_INT(2, qcb->priority);
-
-    // Finalizar hilo correctamente
-    fake_master->running = false;
-    pthread_join(fake_master->aging_thread, NULL);
-
-    // Liberar memoria
-    destroy_fake_master(fake_master);
-/*     pthread_mutex_destroy(&master->queries_table->query_table_mutex);
-    list_destroy(master->queries_table->ready_queue);
-    log_destroy(master.logger);
-    master.logger = NULL;
-
-    free(master.queries_table); */
-    free(qcb);
+    carga_finalizada = true;
+    return NULL;
 }
+
+void* hilo_reordenamiento(void* arg) {
+    t_master* master = (t_master*)arg;
+
+    for (int i = 0; i < CANTIDAD_ITERACIONES; i++) {
+        pthread_mutex_lock(&master->queries_table->query_table_mutex);
+        list_sort(master->queries_table->ready_queue, comparador_prioridad);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+
+        usleep(INTERVALO_REORDENAMIENTO_US);
+    }
+
+    reordenamiento_finalizado = true;
+    return NULL;
+}
+
+void test_concurrencia_carga_y_reordenamiento() {
+    t_master* master = init_fake_master();
+
+    pthread_t carga_thread, reordenamiento_thread;
+    pthread_create(&carga_thread, NULL, hilo_carga_queries, master);
+    pthread_create(&reordenamiento_thread, NULL, hilo_reordenamiento, master);
+
+    int elapsed = 0;
+    while (elapsed < 5000) {
+        if (carga_finalizada && reordenamiento_finalizado) break;
+        usleep(10000);
+        elapsed += 10;
+    }
+
+    if (!carga_finalizada || !reordenamiento_finalizado) {
+        TEST_FAIL_MESSAGE("⚠️ Posible deadlock: los hilos no finalizaron.");
+    } else {
+        printf("✅ Cola final con %d elementos\n", list_size(master->queries_table->ready_queue));
+        TEST_PASS_MESSAGE("Ambos hilos finalizaron sin deadlock.");
+    }
+
+    pthread_join(carga_thread, NULL);
+    pthread_join(reordenamiento_thread, NULL);
+    destroy_fake_master(master);
+}
+
+
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_aging_increases_priority_after_interval);
+
+    RUN_TEST(test_concurrencia_carga_y_reordenamiento);
+
     return UNITY_END();
 }
 

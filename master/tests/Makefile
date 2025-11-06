@@ -1,24 +1,18 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -g \
-	-I../src \
-	-I../../utils/src \
-	-I../../utils/src/connection \
-	-I./unity/src
+SUBDIRS := aging deadlock
 
-LIBS = -lcommons -lpthread -lcrypto
-
-SRCS = \
-	test_aging.c \
-	unity/src/unity.c \
-	../src/query_control_manager.c \
-	../src/scheduler.c \
-	../src/aging.c \
-	../../utils/src/connection/serialization.c
-
-OBJS = $(SRCS:.c=.o)
-
-test_aging: $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LIBS)
+all:
+	@for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir || exit 1; \
+	done
 
 clean:
-	rm -f $(OBJS) test_aging
+	@for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean || exit 1; \
+	done
+
+test: all
+	@for dir in $(SUBDIRS); do \
+		echo "\n== Ejecutando tests en $$dir =="; \
+		(cd $${dir} && ./test_$${dir}); \
+	done
+
