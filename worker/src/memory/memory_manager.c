@@ -29,6 +29,8 @@ static bool mm_find_page_for_frame(
     }
     return false;
 }
+//--Helper--
+
 
 static void mm_resize_entries(memory_manager_t *mm)
 {
@@ -66,6 +68,8 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     mm->last_victim_tag = NULL;
     mm->last_victim_page = 0;
     mm->last_victim_valid = false;
+    mm->frame_table.clock_pointer = 0;
+
 
 
     mm->physical_memory = malloc(memory_size);
@@ -292,6 +296,7 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
             // Intentar manejar el page fault
             if (mm_handle_page_fault(mm, pt, file, tag, current_page) != 0)
                 return -1;
+            entry = &pt->entries[current_page];   // Releer entry para asegurar que el entry->frame que se usa es el que se acaba de mapear.
         }
 
         mm_update_page_access(mm, pt, current_page);
@@ -407,6 +412,7 @@ int mm_allocate_frame(memory_manager_t *mm)
                      "## Query %d: Frame %d liberado usando algoritmo CLOCK-M",
                      mm->query_id,
                      victim_frame);
+
             return victim_frame;
         }
     }
@@ -516,6 +522,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
 
         void *frame_addr = mm_get_frame_address(mm, victim_frame);
 
+
         int write_result = write_block_to_storage(
             mm->storage_socket,
             victim_file,
@@ -526,19 +533,20 @@ int mm_find_lru_victim(memory_manager_t *mm)
             mm->worker_id
         );
 
-         if (write_result != 0)
-        {
-            log_error(logger_get(),
-                      "## Query %d: Error al escribir página sucia en Storage - File: %s - Tag: %s - Pagina: %d",
-                      mm->query_id, victim_file, victim_tag, victim_page);
+            if (write_result != 0)
+            {
+                log_error(logger_get(),
+                        "## Query %d: Error al escribir página sucia en Storage - File: %s - Tag: %s - Pagina: %d",
+                        mm->query_id, victim_file, victim_tag, victim_page);
+                return -1;
 
-        }
-         else
-        {
-            log_info(logger_get(),
-                     "## Query %d: Página sucia escrita en Storage - File: %s - Tag: %s - Pagina: %d",
-                     mm->query_id, victim_file, victim_tag, victim_page);
-        }
+            }
+            else
+            {
+                log_info(logger_get(),
+                        "## Query %d: Página sucia escrita en Storage - File: %s - Tag: %s - Pagina: %d",
+                        mm->query_id, victim_file, victim_tag, victim_page);
+            }
 
         }
 
@@ -600,7 +608,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
                 mm->frame_table.frames[idx].used = false;
 
                 log_info(logger_get(),
-                         "## Query %d: - Se libera el Marco: %d - File: %s - Tag: %s",
+                         "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
                          mm->query_id, idx, entry->file, entry->tag);
 
                 mm->last_victim_file  = entry->file;
@@ -679,6 +687,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
                 log_error(logger_get(),
                           "## Query %d: Error al escribir página sucia en Storage - File: %s - Tag: %s - Pagina: %d",
                           mm->query_id, dirty_entry->file, dirty_entry->tag, dirty_page_idx);
+                return -1;
             } else {
                 log_info(logger_get(),
                          "## Query %d: Página sucia escrita en Storage - File: %s - Tag: %s - Pagina: %d",
@@ -689,7 +698,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
             mm->frame_table.frames[dirty_candidate_frame].used = false;
 
             log_info(logger_get(),
-                     "## Query %d: - Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                     "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
                      mm->query_id,
                      dirty_candidate_frame,
                      dirty_entry->file,
