@@ -7,14 +7,6 @@
 #include <commons/log.h>
 
 
-
-t_log* logger_get(void) {
-    static t_log* l = NULL;
-    if (!l)
-        l = log_create("tests.log", "TESTS", false, LOG_LEVEL_INFO);
-    return l;
-}
-
 static int mm_test_write(memory_manager_t *mm, page_table_t *pt,
                          uint32_t base, const void *data, size_t size)
 {
