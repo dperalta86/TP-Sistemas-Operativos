@@ -1,8 +1,10 @@
 #include "memory_manager.h"
 #include "../connections/storage.h"
 #include <utils/logger.h>
+#include <stdatomic.h>
 
-static uint64_t global_timestamp = 0;
+
+static _Atomic uint64_t global_timestamp = 0;
 
 //--Helper--
 bool mm_find_page_for_frame(
@@ -477,7 +479,8 @@ void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page
         return;
     
     if (mm->policy == LRU) {
-        pt_update_access_time(pt, page_number, ++global_timestamp);
+        uint64_t new_ts = atomic_fetch_add(&global_timestamp, 1) +1;
+        pt_update_access_time(pt, page_number, new_ts);
         return;
     }
 
