@@ -21,6 +21,9 @@ typedef enum {
     OP_WORKER_EVICT_RES,
     QC_OP_DISCONNECTION,
     WORKER_OP_DISCONNECTION
+    OP_ASSIGN_QUERY,
+    OP_EJECT_QUERY,
+    OP_END_QUERY
 } t_master_op_code;
 
 typedef enum {

@@ -12,7 +12,7 @@
 #include <utils/logger.h>
 #include <utils/utils.h>
 
-filesystemint create_dir_recursive(const char *path) {
+int create_dir_recursive(const char *path) {
   char command[PATH_MAX + 20];
   snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
 
@@ -372,4 +372,185 @@ int delete_logical_block(const char *mount_point, const char *name,
            physical_block_index);
 
   return 0;
+}
+
+bool file_dir_exists(const char *file_name, const char *tag) {
+  char tag_path[PATH_MAX];
+  struct stat st;
+
+  snprintf(tag_path, sizeof(tag_path), "%s/files/%s/%s",
+           g_storage_config->mount_point, file_name, tag);
+
+  return stat(tag_path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+t_package *prepare_error_response(uint32_t query_id, t_storage_op_code op_code,
+                                  int op_error_code) {
+  t_package *response = package_create_empty(op_code);
+  if (!response) {
+    log_error(g_storage_logger,
+              "## Query ID: %d - Fallo al crear paquete de respuesta de error",
+              query_id);
+    return NULL;
+  }
+
+  if (!package_add_int8(response, op_error_code)) {
+    log_error(g_storage_logger,
+              "## Query ID: %d - Fallo al agregar el código de error al "
+              "paquete de respuesta",
+              query_id);
+    package_destroy(response);
+    return NULL;
+  }
+
+  return response;
+}
+
+bool logical_block_exists(const char *file_name, const char *tag,
+                          uint32_t block_number, char *logical_block_path,
+                          size_t path_size) {
+  snprintf(logical_block_path, path_size,
+           "%s/files/%s/%s/logical_blocks/%04d.dat",
+           g_storage_config->mount_point, file_name, tag, block_number);
+
+  return regular_file_exists(logical_block_path);
+}
+
+bool physical_block_exists(uint32_t block_number, char *physical_block_path,
+                           size_t path_size) {
+  snprintf(physical_block_path, path_size, "%s/physical_blocks/block%04d.dat",
+           g_storage_config->mount_point, block_number);
+
+  return regular_file_exists(physical_block_path);
+}
+
+int ph_block_links(char *logical_block_path) {
+  struct stat file_stat;
+  if (stat(logical_block_path, &file_stat) != 0) {
+    log_error(g_storage_logger, "No se pudo obtener el estado del bloque %s",
+              logical_block_path);
+    return -1;
+  }
+
+  return file_stat.st_nlink;
+}
+
+ssize_t get_free_bit_index(t_bitarray *bitmap) {
+  size_t max_bit = bitarray_get_max_bit(bitmap);
+
+  for (size_t i = 0; i < max_bit; i++) {
+    if (!bitarray_test_bit(bitmap, i)) {
+      return (ssize_t)i;
+    }
+  }
+  return -1;
+}
+
+FILE *open_bitmap_file(const char *modes) {
+  char bitmap_path[PATH_MAX];
+  snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
+           g_storage_config->mount_point);
+
+  FILE *bitmap_file = fopen(bitmap_path, modes);
+  if (!bitmap_file) {
+    log_error(g_storage_logger, "No se pudo abrir el archivo bitmap: %s",
+              bitmap_path);
+    return NULL;
+  }
+
+  return bitmap_file;
+}
+
+int bitmap_load(t_bitarray **bitmap, char **bitmap_buffer) {
+  int retval = 0;
+  size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
+
+  FILE *bitmap_file = open_bitmap_file("rb");
+  if (bitmap_file == NULL) {
+    retval = -1;
+    goto end;
+  }
+
+  *bitmap_buffer = calloc(1, bitmap_size_bytes);
+  if (!*bitmap_buffer) {
+    log_error(g_storage_logger, "No se pudo asignar memoria para el bitmap");
+    retval = -2;
+    goto clean_file;
+  }
+
+  pthread_mutex_lock(&g_storage_bitmap_mutex);
+
+  if (fread(*bitmap_buffer, 1, bitmap_size_bytes, bitmap_file) !=
+      bitmap_size_bytes) {
+    log_error(g_storage_logger, "No se pudo leer el bitmap completo");
+    pthread_mutex_unlock(&g_storage_bitmap_mutex);
+    free(*bitmap_buffer);
+    retval = -3;
+    goto clean_file;
+  }
+
+  *bitmap =
+      bitarray_create_with_mode(*bitmap_buffer, bitmap_size_bytes, MSB_FIRST);
+  if (!*bitmap) {
+    log_error(g_storage_logger, "No se pudo crear el bitmap en memoria");
+    pthread_mutex_unlock(&g_storage_bitmap_mutex);
+    free(*bitmap_buffer);
+    retval = -4;
+  }
+
+clean_file:
+  if (bitmap_file)
+    fclose(bitmap_file);
+end:
+  return retval;
+}
+
+int bitmap_persist(t_bitarray *bitmap, char *bitmap_buffer) {
+  int retval = 0;
+  size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
+
+  FILE *bitmap_file = open_bitmap_file("r+b");
+  if (bitmap_file == NULL) {
+    pthread_mutex_unlock(&g_storage_bitmap_mutex);
+    retval = -1;
+    goto end;
+  }
+
+  fseek(bitmap_file, 0, SEEK_SET);
+
+  int written_bytes = fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file);
+
+  pthread_mutex_unlock(&g_storage_bitmap_mutex);
+
+  if (written_bytes != (int)bitmap_size_bytes) {
+    log_error(g_storage_logger, "No se pudo escribir el bitmap modificado");
+    retval = -2;
+    goto clean_file;
+  }
+
+  log_info(g_storage_logger, "Bitmap persistido correctamente");
+
+clean_file:
+  if (bitmap_file)
+    fclose(bitmap_file);
+end:
+  if (bitmap)
+    bitarray_destroy(bitmap);
+  if (bitmap_buffer)
+    free(bitmap_buffer);
+  return retval;
+}
+
+void set_bitmap_bits(t_bitarray *bitmap, int start_index, size_t count,
+                     int set_bits) {
+  for (size_t i = 0; i < count; i++) {
+    if (set_bits) {
+      bitarray_set_bit(bitmap, start_index + i);
+    } else {
+      bitarray_clean_bit(bitmap, start_index + i);
+    }
+  }
+
+  log_info(g_storage_logger, "Modificados %zu bits en el bitmap buffer (%s)",
+           count, set_bits ? "seteados" : "unseteados");
 }

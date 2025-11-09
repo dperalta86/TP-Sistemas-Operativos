@@ -5,6 +5,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <connection/protocol.h>
+#include <connection/serialization.h>
+#include <commons/config.h>
+#include <commons/bitarray.h>
+#include "utils/utils.h"
 
 #define DEFAULT_DIR_PERMISSIONS 0755
 #define FILES_DIR "files"
@@ -138,5 +143,102 @@ void destroy_file_metadata(t_file_metadata *metadata);
 int delete_logical_block(const char *mount_point, const char *name,
                          const char *tag, int logical_block_index,
                          int physical_block_index, uint32_t query_id);
+
+/**
+ * Verifica la existencia del directorio lógico para un File:Tag.
+ * 
+ * @param file_name Nombre del archivo.
+ * @param tag Tag del archivo.
+ * @return bool true si el directorio existe, false en caso contrario.
+ */
+bool file_dir_exists(const char *file_name, const char *tag);
+
+/**
+ * Verifica la existencia del hardlink del bloque lógico de un File:Tag.
+ * 
+ * @param file_name Nombre del archivo.
+ * @param tag Tag del archivo.
+ * @param block_number Número de bloque lógico.
+ * @param logical_block_path Puntero al buffer donde se guardará la ruta completa.
+ * @param path_size Tamaño del buffer logical_block_path.
+ * @return bool true si el hardlink existe, false en caso contrario.
+ */
+bool logical_block_exists(const char *file_name, const char *tag, uint32_t block_number, char *logical_block_path, size_t path_size);
+
+/**
+ * Verifica la existencia de un archivo de bloque físico.
+ * 
+ * @param block_number Número de bloque físico.
+ * @param physical_block_path Puntero al buffer donde se guardará la ruta completa.
+ * @param path_size Tamaño del buffer physical_block_path.
+ * @return bool true si el archivo físico existe, false en caso contrario.
+ */
+bool physical_block_exists(uint32_t block_number, char *physical_block_path, size_t path_size);
+
+/**
+ * Devuelve la cantidad de hardlinks de un bloque físico.
+ * 
+ * @param logical_block_path Ruta completa a un hardlink lógico que apunta al bloque físico.
+ * @return int positivo que indica la cantidad de hardlinks del bloque físico, -1 en caso contrario.
+ */
+int ph_block_links(char *logical_block_path);
+
+/**
+ * Abre el archivo binario del bitmap en el modo especificado.
+ * 
+ * @param modes Modo de apertura del archivo (ej: "rb", "r+b", "wb").
+ * @return FILE* Puntero al archivo abierto, o NULL si falla.
+ */
+FILE *open_bitmap_file(const char *modes);
+
+/**
+ * Carga el bitmap desde disco a un buffer.
+ * La función maneja internamente el bloqueo del mutex global g_storage_bitmap_mutex, 
+ * pero lo deja desbloqueado en caso de error.
+ * 
+ * @param bitmap Doble puntero a t_bitarray donde se almacenará la estructura.
+ * @param bitmap_buffer Doble puntero al char donde se almacenará el buffer crudo.
+ * @return int 0 si la carga es exitosa, un valor negativo en caso de error.
+ */
+int bitmap_load(t_bitarray **bitmap, char **bitmap_buffer);
+
+/**
+ * Persiste el bitmap modificado a disco.
+ * 
+ * @param bitmap La estructura t_bitarray a persistir (será destruida).
+ * @param bitmap_buffer El buffer crudo del bitmap (será liberado).
+ * @return int 0 si la persistencia es exitosa, un valor negativo en caso de error.
+ */
+int bitmap_persist(t_bitarray *bitmap, char *bitmap_buffer);
+
+/**
+ * Busca el índice del primer bit libre (0) en el bitmap.
+ * 
+ * @param bitmap La estructura t_bitarray a inspeccionar.
+ * @return ssize_t El índice del bit libre encontrado, o -1 si el bitmap está lleno.
+ */
+ssize_t get_free_bit_index(t_bitarray *bitmap);
+
+/**
+ * Modifica un rango contiguo de bits en el bitmap.
+ * 
+ * @param bitmap La estructura t_bitarray a modificar.
+ * @param start_index Índice del primer bit a modificar.
+ * @param count Cantidad de bits a modificar.
+ * @param set_bits 1 para setear (a 1) los bits, 0 para limpiar (a 0) los bits.
+ */
+void set_bitmap_bits(t_bitarray *bitmap, int start_index, size_t count, int set_bits);
+
+/**
+ * Crea un paquete de respuesta estándar para notificar un error de protocolo al Worker.
+ * * El paquete contiene la Query ID, el código de operación (ej. WRITE_BLOCK_RES)
+ * y el código de error específico (ej. FILE_TAG_MISSING).
+ * 
+ * @param query_id ID de la Query asociada.
+ * @param op_code Código de operación del tipo de respuesta (ej. STORAGE_OP_BLOCK_WRITE_RES).
+ * @param op_error_code Código de error específico del Storage.
+ * @return t_package* El paquete de respuesta de error creado, o NULL si falla la creación del paquete.
+ */
+t_package *prepare_error_response(uint32_t query_id, t_storage_op_code op_code, int op_error_code);
 
 #endif

@@ -21,6 +21,6 @@ int handshake_with_server(const char *server_name,
                           const char *port,
                           uint8_t request_op,
                           uint8_t expected_response_op,
-                          char *worker_id);
+                          int worker_id);
 
 #endif

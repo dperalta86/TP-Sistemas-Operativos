@@ -9,6 +9,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <utils/filesystem_utils.h>
+#include <globals/globals.h>
+#include "file_locks.h"
 
 #define TEST_MOUNT_POINT "/tmp/storage_test"
 #define TEST_BLOCK_SIZE 128
@@ -109,5 +112,81 @@ int files_are_hardlinked(const char *file1_path, const char *file2_path);
  * @return 0 en caso de exito, -1 si falla
  */
 int create_test_superblock(const char *mount_point);
+
+/**
+ * Crea un archivo de configuración para el módulo Storage.
+ * 
+ * @param storage_ip Dirección IP del servicio de almacenamiento.
+ * @param storage_port Puerto del servicio de almacenamiento.
+ * @param fresh_start Flag de inicio limpio.
+ * @param mount_point Ruta base donde se creará el archivo de configuración.
+ * @param operation_delay Tiempo de retardo en milisegundos para operaciones.
+ * @param block_access_delay Tiempo de retardo en milisegundos para el acceso a bloques.
+ * @param log_level Nivel de log deseado.
+ * @return int 0 si la configuración se creó exitosamente.
+ * @return int -1 si alguno de los parámetros de cadena es nulo.
+ * @return int -2 si falla la apertura o escritura del archivo.
+ */
+int create_test_storage_config(
+    char *storage_ip, 
+    char *storage_port, 
+    char *fresh_start,
+    char *mount_point,
+    int operation_delay,
+    int block_access_delay,
+    char *log_level
+);
+
+/**
+ * Inicializa los bloques lógicos de un archivo simulado.
+ * Crea hardlinks a un bloque físico inicial (block0000.dat).
+ * 
+ * @param name Nombre del archivo.
+ * @param tag Etiqueta del archivo.
+ * @param numb_blocks Número de bloques lógicos a inicializar para el archivo.
+ * @param mount_point Punto de montaje base.
+ * @return int 0 si los bloques lógicos se inicializaron correctamente.
+ * @return int -1 si falla la creación recursiva del directorio.
+ * @return int -2 si falla la creación de algún hardlink al bloque físico.
+ */
+int init_logical_blocks(const char *name, const char *tag, int numb_blocks, const char *mount_point);
+
+/**
+ * Crea el archivo de metadatos para un archivo de prueba.
+ * 
+ * @param name Nombre del archivo.
+ * @param tag Etiqueta asociada al archivo.
+ * @param numb_blocks Número de bloques que debe contener el archivo.
+ * @param blocks_array_str Array de IDs de bloques (ej: "[1,2,3,4]").
+ * @param status Estado del archivo: "WORK_IN_PROGRESS" o "COMMITTED".
+ * @param mount_point Punto de montaje base.
+ * @return int 0 si el archivo de metadatos se creó exitosamente.
+ * @return int -1 si el número de bloques solicitado excede el tamaño del FS de prueba (TEST_FS_SIZE).
+ * @return int -2 si el número de bloques solicitado no coincide con la longitud del array de bloques proporcionado.
+ * @return int -3 si falla la apertura o escritura del archivo de metadatos.
+ */
+int create_test_metadata(const char *name, const char *tag, int numb_blocks, char *blocks_array_str, char *status, char *mount_point);
+
+/**
+ * Verifica si un archivo ha sido desbloqueado correctamente en el diccionario de archivos abiertos.
+ * 
+ * @note Esta función asume la existencia de las variables globales g_storage_open_files_dict_mutex 
+ * y g_open_files_dict (un diccionario que almacena t_file_mutex*).
+ * 
+ * @param name Nombre del archivo.
+ * @param tag Etiqueta del archivo.
+ * @return bool Verdadero (true) si el desbloqueo fue exitoso o el archivo nunca se abrió
+ * @return bool Falso (false) si el archivo AÚN se encuentra bloqueado.
+ */
+bool correct_unlock(const char *name, const char *tag);
+
+/**
+ * Intenta bloquear y desbloquear un mutex para determinar si está libre.
+ * 
+ * @param mutex Puntero al mutex de pthread a verificar.
+ * @return int 0 si el mutex estaba libre y pudo ser bloqueado y liberado exitosamente.
+ * @return int -1 si el mutex está actualmente bloqueado por otro hilo.
+ */
+int mutex_is_free(pthread_mutex_t *mutex);
 
 #endif

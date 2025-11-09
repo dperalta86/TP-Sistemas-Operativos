@@ -1,4 +1,5 @@
 #include "server.h"
+#include "operations/create_tag.h"
 #include "operations/delete_tag.h"
 #include <stdbool.h>
 
@@ -44,13 +45,13 @@ void *handle_client(void *arg) {
       response = handle_truncate_file_op_package(request);
       break;
     case STORAGE_OP_TAG_CREATE_REQ:
-      response = create_tag(request);
+      response = handle_create_tag_op_package(request);
       break;
     case STORAGE_OP_TAG_COMMIT_REQ:
       response = commit_tag(request);
       break;
     case STORAGE_OP_BLOCK_WRITE_REQ:
-      response = write_block(request);
+      response = handle_write_block_request(request);
       break;
     case STORAGE_OP_BLOCK_READ_REQ:
       response = read_block(request);

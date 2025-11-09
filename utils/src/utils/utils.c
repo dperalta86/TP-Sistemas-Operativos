@@ -36,3 +36,8 @@ char* get_stringified_array(char** array) {
     string_append(&resultado, "]");
     return resultado;
 }
+
+bool regular_file_exists(char *file_path) {
+  struct stat info;
+  return (stat(file_path, &info) == 0 && S_ISREG(info.st_mode));
+}
