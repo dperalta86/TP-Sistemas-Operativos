@@ -238,7 +238,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (page_table == NULL) {
                 return -1;
             }
-            int result = mm_write_to_memory(memory_manager, page_table, instruction->write.base, instruction->write.data, strlen((char*)instruction->write.data));
+            int result = mm_write_to_memory(memory_manager, page_table, instruction->write.file, instruction->write.tag, instruction->write.base, instruction->write.data, strlen((char*)instruction->write.data));
             if (result != 0) {
                 return -1;
             }
@@ -253,7 +253,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (buffer == NULL) {
                 return -1;
             }
-            int result = mm_read_from_memory(memory_manager, page_table, instruction->read.base, instruction->read.size, buffer);
+            int result = mm_read_from_memory(memory_manager, page_table, instruction->read.file, instruction->read.tag, instruction->read.base, instruction->read.size, buffer);
             if (result != 0) {
                 free(buffer);
                 return -1;
@@ -287,7 +287,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
                 if (!frame_data) {
                     continue;
                 }
-                int read_result = mm_read_from_memory(memory_manager, page_table, p->page_number * memory_manager->page_size, memory_manager->page_size, frame_data);
+                int read_result = mm_read_from_memory(memory_manager, page_table, instruction->file_tag.file, instruction->file_tag.tag, p->page_number * memory_manager->page_size, memory_manager->page_size, frame_data);
                 if (read_result != 0) {
                     free(frame_data);
                     continue;
