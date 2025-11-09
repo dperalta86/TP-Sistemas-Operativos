@@ -31,6 +31,7 @@ typedef struct {
     char *query_file_path;
     int priority;
     int initial_priority;
+    uint64_t ready_timestamp;
     int assigned_worker_id;
     int program_counter;
     t_query_state state;
@@ -99,5 +100,7 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
  */
 int insert_query_by_priority(t_list *ready_queue, t_query_control_block *new_qcb);
 
+
+uint64_t now_ms_monotonic();
 
 #endif // QUERY_CONTROL_MANAGER_H

@@ -1,9 +1,19 @@
+#define _POSIX_C_SOURCE 200809L 
 #include "init_master.h"
 #include "query_control_manager.h"
 #include "scheduler.h"
 #include "connection/protocol.h"
 #include "connection/serialization.h"
 #include "commons/log.h"
+#include <time.h>
+#include <stdint.h>
+
+// función auxiliar para manejar el aging
+uint64_t now_ms_monotonic() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)(ts.tv_nsec / 1000000ULL);
+}
 
 int manage_query_handshake(int client_socket, t_log *logger) {
     t_package *response_package = package_create_empty(OP_QUERY_HANDSHAKE);
@@ -87,6 +97,7 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
     qcb->assigned_worker_id = -1; // Debería ser -1 al principio (sin asignar)
     qcb->program_counter = 0; // Inicia en 0, luego lo actualiza con datos desde el Worker
     qcb->state = QUERY_STATE_READY; // Inicia en READY al ser creada
+    qcb->ready_timestamp = now_ms_monotonic();
 
     // Agregamos a la lista principal y a la cola de ready (teniendo en cuenta planificador)
     list_add(master->queries_table->query_list, qcb);

@@ -2,6 +2,7 @@
 #include "init_master.h"
 #include "query_control_manager.h"
 #include "worker_manager.h"
+#include "aging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,12 +53,22 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
         log_error(logger, "No se pudo asignar memoria para el puerto del Master");
         goto error;
     }
-    master->aging_interval = aging_interval;
+
+    // Planificador
     master->scheduling_algorithm = strdup(scheduling_algorithm);
     if (master->scheduling_algorithm == NULL) {
         log_error(logger, "No se pudo asignar memoria para el algoritmo de planificación");
         goto error;
     }
+    // Aging
+    master->aging_interval = aging_interval;
+    if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+        pthread_create(&master->aging_thread, NULL, aging_thread_func, master);
+        log_info(master->logger, "Aging habilitado (scheduler PRIORITY)");
+    } else {
+        log_info(master->logger, "Aging deshabilitado (scheduler FIFO)");
+    }
+
     master->multiprogramming_level = 0; // Inicialmente 0, se actualizará con las conexiones de workers
 
     master->logger = logger;
@@ -86,6 +97,10 @@ void destroy_master(t_master *master) {
         }
         if (master->queries_table != NULL) {
             free(master->queries_table);
+        }
+        if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+            pthread_join(master->aging_thread, NULL);
+            log_info(master->logger, "Aging thread finalizado correctamente.");
         }
         free(master);
     }
