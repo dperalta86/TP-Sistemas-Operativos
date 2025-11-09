@@ -38,7 +38,6 @@ typedef struct master {
     // Hilos principales
     pthread_t aging_thread; // Hilo de envejecimiento
     pthread_t scheduling_thread; // Hilo de planificación
-    pthread_t health_check_thread; // Hilo de chequeo de salud de workers y queries
 
     // Logger
     t_log *logger;
@@ -80,5 +79,6 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
  * @param master Puntero a la estructura t_master a destruir (puede ser NULL)
  */
 void destroy_master(t_master *master);
+
 
 #endif
