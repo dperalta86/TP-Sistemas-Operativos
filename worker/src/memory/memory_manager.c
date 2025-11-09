@@ -221,13 +221,12 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
     size_t remaining = size;
     uint8_t *ptr = buffer;
 
-    usleep(mm->memory_retardation * 1000);
-
     while (remaining > 0)
     {
         if (current_page >= pt->page_count)
             return -1;
 
+        usleep(mm->memory_retardation * 1000);  
         pt_entry_t *entry = &pt->entries[current_page];
         if (!entry->present)
         {
@@ -241,6 +240,7 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         if (bytes_to_copy > remaining)
             bytes_to_copy = remaining;
 
+        usleep(mm->memory_retardation * 1000);
         if (write)
             memcpy(frame_addr + offset, ptr, bytes_to_copy);
         else
