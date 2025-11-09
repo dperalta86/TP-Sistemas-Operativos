@@ -139,13 +139,12 @@ int mm_write_to_memory(memory_manager_t *mm,
     size_t bytes_remaining = size;
     const uint8_t *data_ptr = data;
 
-    usleep(mm->memory_retardation * 1000);
-
     while (bytes_remaining > 0)
     {
         if (current_page >= page_table->page_count)
             return -1;
 
+        usleep(mm->memory_retardation * 1000);
         pt_entry_t *entry = &page_table->entries[current_page];
 
         if (!entry->present)
@@ -160,6 +159,7 @@ int mm_write_to_memory(memory_manager_t *mm,
         if (bytes_to_copy > bytes_remaining)
             bytes_to_copy = bytes_remaining;
 
+        usleep(mm->memory_retardation * 1000);
         memcpy(frame_addr + offset, data_ptr, bytes_to_copy);
 
         pt_mark_dirty(page_table, current_page);
@@ -188,13 +188,12 @@ int mm_read_from_memory(memory_manager_t *mm,
     size_t bytes_remaining = size;
     uint8_t *out_ptr = out_buffer;
 
-    usleep(mm->memory_retardation * 1000);
-
     while (bytes_remaining > 0)
     {
         if (current_page >= page_table->page_count)
             return -1;
 
+        usleep(mm->memory_retardation * 1000);
         pt_entry_t *entry = &page_table->entries[current_page];
 
         if (!entry->present)
@@ -209,6 +208,7 @@ int mm_read_from_memory(memory_manager_t *mm,
         if (bytes_to_copy > bytes_remaining)
             bytes_to_copy = bytes_remaining;
 
+        usleep(mm->memory_retardation * 1000);
         memcpy(out_ptr, frame_addr + offset, bytes_to_copy);
 
         out_ptr += bytes_to_copy;
