@@ -189,4 +189,12 @@ bool correct_unlock(const char *name, const char *tag);
  */
 int mutex_is_free(pthread_mutex_t *mutex);
 
+/**
+ * Simula el estado final de un paquete después de haber sido serializado
+ * y recibido por la red. Ajusta el 'size' del buffer para que sea igual al 'offset' (datos usados).
+ * 
+ * @param package El paquete a modificar.
+ */
+void package_simulate_reception(t_package *package);
+
 #endif

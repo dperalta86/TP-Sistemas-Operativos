@@ -221,3 +221,14 @@ int mutex_is_free(pthread_mutex_t *mutex) {
     }
     return -1;
 }
+
+void package_simulate_reception(t_package *package)
+{
+    if (!package || !package->buffer) {
+        return;
+    }
+    
+    package->buffer->size = package->buffer->offset;
+    
+    package_reset_read_offset(package);
+}
