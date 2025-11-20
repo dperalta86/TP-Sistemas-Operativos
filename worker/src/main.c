@@ -72,12 +72,16 @@ int main(int argc, char *argv[])
     t_log *logger = logger_get();
     log_info(logger, "## Worker iniciado - ID=%d", worker_id);
 
+    int socket_storage = -1;
+    int socket_master = -1;
+    memory_manager_t *mm = NULL;
+
     /* Handshake con Storage y Master */
-    int socket_storage = handshake_with_storage(config->storage_ip, config->storage_port, worker_id);
+    socket_storage = handshake_with_storage(config->storage_ip, config->storage_port, worker_id);
     if (socket_storage < 0)
         goto cleanup;
 
-    int socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
+    socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
     if (socket_master < 0)
         goto cleanup;
 
@@ -92,7 +96,7 @@ int main(int argc, char *argv[])
     config->block_size = block_size;
     log_info(logger, "## Tamaño de bloque recibido: %d", config->block_size);
 
-    memory_manager_t *mm = mm_create(
+    mm = mm_create(
         config->memory_size,
         config->block_size,
         (pt_replacement_t)config->replacement_algorithm, config->memory_retardation);
@@ -144,11 +148,11 @@ cleanup:
         close(socket_master);
     if (socket_storage >= 0)
         close(socket_storage);
+    if (mm)
+        mm_destroy(mm);
     if (config)
         destroy_worker_config(config);
     logger_destroy();
-    mm_destroy(mm);
-    pthread_mutex_destroy(&state.mux);
     return 0;
 }
 
