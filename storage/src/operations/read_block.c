@@ -109,7 +109,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
-              "## Query ID: %d - El directorio %s:%s no existe.", query_id,
+              "## Query ID: %" PRIu32 " - El directorio %s:%s no existe.", query_id,
               name, tag);
     retval = FILE_TAG_MISSING;
     goto cleanup_unlock;
@@ -119,7 +119,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
       read_file_metadata(g_storage_config->mount_point, name, tag);
   if (metadata == NULL) {
     log_error(g_storage_logger,
-              "## Query ID: %d - No se pudo leer el metadata de %s:%s.",
+              "## Query ID: %" PRIu32 " - No se pudo leer el metadata de %s:%s.",
               query_id, name, tag);
     retval = FILE_TAG_MISSING;
     goto cleanup_unlock;
@@ -127,7 +127,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
 
   if ((int)block_number >= metadata->block_count) {
     log_error(g_storage_logger,
-              "## Query ID: %d - El bloque lógico %d no existe en %s:%s. Fuera "
+              "## Query ID: %" PRIu32 " - El bloque lógico %" PRIu32 " no existe en %s:%s. Fuera "
               "de rango [0, %d]",
               query_id, block_number, name, tag, metadata->block_count);
     retval = READ_OUT_OF_BOUNDS;
@@ -157,7 +157,7 @@ int read_from_logical_block(uint32_t query_id, const char *file_name,
                               
   char logical_block_path[PATH_MAX];
   snprintf(logical_block_path, sizeof(logical_block_path),
-           "%s/files/%s/%s/logical_blocks/%04d.dat",
+           "%s/files/%s/%s/logical_blocks/%04" PRIu32 ".dat",
            g_storage_config->mount_point, file_name, tag, block_number);
 
   FILE *block_file = fopen(logical_block_path, "rb");
@@ -169,9 +169,9 @@ int read_from_logical_block(uint32_t query_id, const char *file_name,
     goto end;
   }
 
-  size_t bytes_leidos = fread(read_buffer, g_storage_config->block_size, 1, block_file);
+  size_t bytes_leidos = fread(read_buffer, 1, g_storage_config->block_size, block_file);
   
-  if (bytes_leidos != 1) {
+  if (bytes_leidos != g_storage_config->block_size) {
     if (ferror(block_file)) {
       log_error(g_storage_logger,
                 "## Query ID: %" PRIu32 " - Error de lectura en el bloque: %s. Faltan bytes.",
