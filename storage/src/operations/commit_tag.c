@@ -51,7 +51,7 @@ int deserialize_tag_commit_request(t_package *package, uint32_t *query_id,
   if (*name == NULL) {
     log_error(g_storage_logger,
               "## Query ID: %" PRIu32 " - Error al deserializar el nombre del "
-                                      "file para la operación COMMIT_TAG",
+              "file para la operación COMMIT_TAG",
               *query_id);
     retval = -2;
     goto end;
@@ -115,6 +115,8 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
     goto cleanup_metadata;
   }
 
+  deduplicate_blocks(query_id, name, tag, metadata);
+
   free(metadata->state);
   metadata->state = strdup(COMMITTED);
   if (!metadata->state) {
@@ -146,5 +148,163 @@ cleanup_metadata:
 cleanup_unlock:
   unlock_file(name, tag);
 
+  return retval;
+}
+
+int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
+                       t_file_metadata *metadata) {
+  int retval = 0;
+
+  // Verifica que el file:tag tiene bloques lógicos.
+  if (metadata->block_count == 0) {
+    log_warning(g_storage_logger,
+                "## Query ID: %" PRIu32
+                " - File %s:%s no tiene bloques lógicos para deduplicar.",
+                query_id, name, tag);
+    goto end;
+  }
+
+  // Carga el config para blocks_hash_index
+  pthread_mutex_lock(g_blocks_hash_index_mutex);
+  char hash_index_config_path[PATH_MAX];
+  snprintf(hash_index_config_path, sizeof(hash_index_config_path),
+           "%s/blocks_hash_index.config", storage_config->mount_point);
+  t_config *hash_index_config = config_load(hash_index_config);
+
+  if (hash_index_config == NULL) {
+    log_error(g_storage_logger,
+              "## Query ID: %" PRIu32
+              " - No se pudo leer el archivo blocks_hash_index.config",
+              query_id);
+    retval = -1;
+    goto unlock_hash_index;
+  }
+
+  // Itera sobre los bloques lógicos del file:tag para deduplicar
+  for (int i = 0; i < metadata->block_count; i++) {
+    int logical_block = metadata->blocks[i];
+
+    // Lee el contenido del bloque físico asociado al bloque lógico
+    char logical_block_path[PATH_MAX];
+    snprintf(logical_block_path, sizeof(logical_block_path),
+             "%s/files/%s/%s/logical_blocks/%04d.dat",
+             g_storage_config->mount_point, name, tag, logical_block);
+
+    char *read_buffer = (char *)malloc(g_storage_config->block_size);
+    if (read_buffer == NULL) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32
+                " - Error de asignación de memoria para leer el bloque: %s",
+                query_id, logical_block_path);
+      retval = -2;
+      goto unlock_hash_index;
+    }
+
+    if (read_block_content(query_id, logical_block_path,
+                           g_storage_config->block_size, read_buffer) < 0) {
+      retval = -3;
+      goto cleanup_buffer;
+    }
+
+    // Hashea el contenido del bloque leído
+    char *hash = crypto_md5(read_buffer, (size_t)g_storage_config->block_size);
+    if (hash == NULL) {
+      log_error(g_storage_config,
+                "## Query ID: %" PRIu32
+                " - No se generó el hash para el bloque %s",
+                query_id, logical_block_path);
+      retval = -3;
+      goto cleanup_buffer;
+    }
+
+    free(read_buffer);
+
+    // Si blocks_hash_index contiene el hash, elimina el archivo del bloque
+    // lógico actual y lo vuelve a crear como hardlink del bloque físico
+    // registrado en blocks_hash_index
+    if (config_has_property(hash_index_config, hash)) {
+      char *physical_block =
+          strdup(config_get_string_value(hash_index_config, hash));
+
+      if (remove(logical_block_path) != 0) {
+        log_error(g_storage_logger,
+                  "## Query ID: %" PRIu32
+                  " - Ocurrió un error al eliminar el bloque lógico %s",
+                  query_id, logical_block_path);
+        retval = -4;
+        goto unlock_hash_index;
+      }
+
+      char physical_block_path[PATH_MAX];
+      snprintf(physical_block_path, sizeof(physical_block_path),
+               "%s/physical_blocks/%s", g_storage_config->mount_point,
+               physical_block);
+      if (link(physical_block_path, logical_block_path) != 0) {
+        log_error(g_storage_logger,
+                  "## Query ID: %" PRIu32
+                  " - No se pudo crear el hard link de %s a %s.",
+                  query_id, physical_block_path, logical_block_path);
+        retval = -5;
+        goto unlock_hash_index;
+      }
+
+      log_info(g_storage_logger,
+               "## Query ID: %" PRIu32 " - %s:%s - Se agregó el hardlink del "
+                                       "bloque lógico %d al bloque físico %s",
+               query_id, name, tag, logical_block, physical_block);
+    }
+  }
+
+cleanup_buffer:
+  if (read_buffer)
+    free(read_buffer);
+unlock_hash_index:
+  if (hash_index_config)
+    destroy_config(hash_index_config);
+  pthread_mutex_unlock(g_blocks_hash_index_mutex);
+end:
+  return retval;
+}
+
+int read_block_content(uint32_t query_id, const char *logical_block_path,
+                       uint32_t block_size, char *read_buffer) {
+  int retval = 0;
+
+  FILE *file = fopen(logical_block_path, "rb");
+  if (file == NULL) {
+    log_error(g_storage_logger,
+              "Query ID: %" PRIu32
+              " - Error al abrir el archivo de bloque lógico: %s",
+              query_id, logical_block_path);
+    retval = -1;
+    goto end;
+  }
+
+  size_t read_bytes = fread(read_buffer, 1, block_size, file);
+
+  if (read_bytes < block_size) {
+    if (feof(file)) {
+      // Lectura parcial
+      memset(read_buffer + read_bytes, 0, block_size - read_bytes);
+      log_warning(g_storage_logger,
+                  "## Query ID: %" PRIu32
+                  " - Bloque lógico %s leído, pero su tamaño (%zu bytes) era "
+                  "menor que el tamaño de bloque estándar (%u). Rellenado con "
+                  "ceros para hashing.",
+                  query_id, logical_block_path, read_bytes, block_size);
+    } else if (ferror(file)) {
+      // Error de lectura
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32
+                " - Error de lectura en el bloque lógico: %s",
+                query_id, logical_block_path);
+      retval = -2;
+    }
+  }
+
+close_file:
+  if (file)
+    fclose(file);
+end:
   return retval;
 }

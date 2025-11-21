@@ -1,6 +1,7 @@
 #ifndef STORAGE_OPERATIONS_COMMIT_TAG_H_
 #define STORAGE_OPERATIONS_COMMIT_TAG_H_
 
+#include <commons/crypto.h>
 #include "connection/serialization.h"
 #include "connection/protocol.h"
 #include "globals/globals.h"
@@ -39,5 +40,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag);
  * @return int 0 en caso de éxito, -1 en caso de error de deserialización.
  */
 int deserialize_tag_commit_request(t_package *package, uint32_t *query_id, char **name, char **tag);
+
+int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag, t_file_metadata *metadata);
 
 #endif
