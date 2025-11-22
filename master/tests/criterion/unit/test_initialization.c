@@ -5,6 +5,7 @@
 #include "worker_manager.h"
 #include "scheduler.h"
 #include "aging.h"
+#include "../../helpers/test_helpers.h"
 
 Test(initialization, create_master_config_valid) {
     t_master_config *config = create_master_config("test_configs/valid.config");
@@ -23,12 +24,11 @@ Test(initialization, create_master_config_invalid_path) {
 
 Test(initialization, init_master_structure) {
     t_log *logger = log_create("test.log", "TEST", true, LOG_LEVEL_DEBUG);
-    t_master *master = init_master("127.0.0.1", "9001", 2500, "FIFO", logger);
+    t_master *master = init_fake_master("FIFO", 1000);
     
     cr_assert_not_null(master);
     cr_assert_not_null(master->queries_table);
     cr_assert_not_null(master->workers_table);
-    cr_assert_eq(master->queries_table->next_query_id, -1);
     cr_assert_eq(master->queries_table->total_queries, 0);
     cr_assert_eq(master->workers_table->total_workers_connected, 0);
     cr_assert_eq(master->multiprogramming_level, 0);

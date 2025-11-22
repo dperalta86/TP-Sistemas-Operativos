@@ -369,23 +369,21 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
 
     log_debug(master->logger, "[cleanup_query_resources] Limpiando recursos para Query ID=%d", qcb->query_id);
 
-    // Remover de listas si están presentes (best-effort)
-    if (master->queries_table && master->queries_table->ready_queue) {
-        if (list_remove_element(master->queries_table->ready_queue, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de ready_queue", qcb->query_id);
-        }
-    }
-    if (master->queries_table && master->queries_table->running_list) {
-        if (list_remove_element(master->queries_table->running_list, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de running_list", qcb->query_id);
-        }
+    // Remover de TODAS las listas (best-effort)
+    if (master->queries_table) {
+        list_remove_element(master->queries_table->ready_queue, qcb);
+        list_remove_element(master->queries_table->running_list, qcb);
+        list_remove_element(master->queries_table->completed_list, qcb);
+        list_remove_element(master->queries_table->canceled_list, qcb);
+        list_remove_element(master->queries_table->query_list, qcb);
     }
 
-    // Liberar campos dinámicos
     if (qcb->query_file_path) {
         free(qcb->query_file_path);
         qcb->query_file_path = NULL;
     }
+    
+    free(qcb);
 }
 
 /**
@@ -396,21 +394,27 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
 void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master) {
     if (!wcb || !master) return;
 
-    log_debug(master->logger, "[cleanup_worker_resources] Limpiando recursos para Worker ID=%d (socket=%d)", wcb->worker_id, wcb->socket_fd);
+    log_debug(master->logger, "[cleanup_worker_resources] Limpiando recursos para Worker ID=%d (socket=%d)", 
+              wcb->worker_id, wcb->socket_fd);
 
-
-    // Remover de listas
-    if (master->workers_table && master->workers_table->idle_list) {
+    // Remover de TODAS las listas
+    if (master->workers_table) {
         list_remove_element(master->workers_table->idle_list, wcb);
-    }
-    if (master->workers_table && master->workers_table->busy_list) {
         list_remove_element(master->workers_table->busy_list, wcb);
+        list_remove_element(master->workers_table->disconnected_list, wcb);
+        list_remove_element(master->workers_table->worker_list, wcb);
+        
+        // Decrementar contador
+        if (master->workers_table->total_workers_connected > 0) {
+            master->workers_table->total_workers_connected--;
+        }
     }
 
-    // Reset fields
-    wcb->current_query_id = -1;
-    wcb->socket_fd = -1;
-    wcb->state = WORKER_STATE_DISCONNECTED;
+    if (wcb->ip_address) {
+        free(wcb->ip_address);
+    }
+    
+    free(wcb);
 }
 
 /**

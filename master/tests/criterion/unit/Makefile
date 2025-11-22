@@ -12,11 +12,12 @@ CRITERION_LIBDIR = $(shell pkg-config --variable=libdir criterion 2>/dev/null ||
 LIBS = -lcriterion -lcommons -lpthread -lcrypto
 LDFLAGS = -Wl,-rpath,$(CRITERION_LIBDIR)
 
-TARGETS = test_initialization test_query_management
+TARGETS = test_initialization test_query_management test_cleanup
 
 # Fuentes del proyecto necesarias
 PROJECT_SRC = \
     ../../../src/query_control_manager.c \
+	../../../src/worker_manager.c \
     ../../../../utils/src/connection/serialization.c \
 	../../../src/scheduler.c \
 	../../../src/init_master.c \
@@ -35,6 +36,11 @@ test_query_management: test_query_management.c
 	@echo "Compilando test_query_management..."
 	$(CC) $(CFLAGS) test_query_management.c $(PROJECT_SRC) -o test_query_management $(LDFLAGS) $(LIBS)
 
+test_cleanup: test_cleanup.c
+	@echo "Compilando test_cleanup..."
+	$(CC) $(CFLAGS) test_cleanup.c $(PROJECT_SRC) -o test_cleanup $(LDFLAGS) $(LIBS)
+
+
 test: all
 	@echo ""
 	@echo "🧪 Ejecutando test_initialization..."
@@ -44,6 +50,10 @@ test: all
 	@echo "🧪 Ejecutando test_query_management..."
 	@echo "======================================="
 	./test_query_management
+	@echo ""
+	@echo "🧪 Ejecutando test_cleanup..."
+	@echo "======================================="
+	./test_cleanup
 
 verbose: all
 	@for test in $(TARGETS); do \
