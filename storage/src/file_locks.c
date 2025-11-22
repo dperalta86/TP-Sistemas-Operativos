@@ -25,13 +25,13 @@ void lock_file(const char *name, const char *tag, bool for_write) {
     dictionary_put(g_open_files_dict, key, fm);
   }
 
+  for_write ? pthread_rwlock_wrlock(&fm->mutex)
+            : pthread_rwlock_rdlock(&fm->mutex);
   fm->ref_count++;
 
   pthread_mutex_unlock(&g_storage_open_files_dict_mutex);
   free(key);
 
-  for_write ? pthread_rwlock_wrlock(&fm->mutex)
-            : pthread_rwlock_rdlock(&fm->mutex);
   return;
 
 cleanup_free_fm:
