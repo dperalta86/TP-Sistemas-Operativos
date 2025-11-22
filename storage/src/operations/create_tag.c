@@ -8,7 +8,7 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
 
   char dst_path[PATH_MAX];
   snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point, name, dst_tag);
-  lock_file(name, dst_tag);
+  lock_file(name, dst_tag, true);
 
   t_file_metadata *metadata =
       read_file_metadata(g_storage_config->mount_point, name, dst_tag);
@@ -24,7 +24,7 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
   snprintf(src_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
            name, src_tag);
 
-  lock_file(name, src_tag);
+  lock_file(name, src_tag, false);
 
   char command[PATH_MAX * 2 + 32];
   snprintf(command, sizeof(command), "cp -rl \"%s\" \"%s\"", src_path, dst_path);

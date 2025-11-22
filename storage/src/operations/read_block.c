@@ -106,7 +106,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
                         uint32_t block_number, void *read_buffer) {
   int retval = 0;
 
-  lock_file(name, tag);
+  lock_file(name, tag, false);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,

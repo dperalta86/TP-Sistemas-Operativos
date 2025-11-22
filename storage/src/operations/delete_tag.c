@@ -15,7 +15,7 @@ int delete_tag(uint32_t query_id, const char *name, const char *tag,
     return -1;
   }
 
-  lock_file(name, tag);
+  lock_file(name, tag, true);
 
   t_file_metadata *metadata = read_file_metadata(mount_point, name, tag);
   if (!metadata) {
