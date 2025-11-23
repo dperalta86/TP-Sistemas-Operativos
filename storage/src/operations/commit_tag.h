@@ -1,6 +1,7 @@
 #ifndef STORAGE_OPERATIONS_COMMIT_TAG_H_
 #define STORAGE_OPERATIONS_COMMIT_TAG_H_
 
+#include <commons/config.h>
 #include <commons/crypto.h>
 #include <dirent.h>
 #include "connection/serialization.h"

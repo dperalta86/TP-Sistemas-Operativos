@@ -171,11 +171,11 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
   }
 
   // Carga el config para blocks_hash_index
-  pthread_mutex_lock(g_blocks_hash_index_mutex);
+  pthread_mutex_lock(&g_blocks_hash_index_mutex);
   char hash_index_config_path[PATH_MAX];
   snprintf(hash_index_config_path, sizeof(hash_index_config_path),
            "%s/blocks_hash_index.config", g_storage_config->mount_point);
-  t_config *hash_index_config = config_load(hash_index_config_path);
+  t_config *hash_index_config = config_create(hash_index_config_path);
 
   if (hash_index_config == NULL) {
     log_error(g_storage_logger,
@@ -322,9 +322,9 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
 
 cleanup_all:
   if (hash_index_config)
-    destroy_config(hash_index_config);
+    config_destroy(hash_index_config);
 unlock_hash_index:
-  pthread_mutex_unlock(g_blocks_hash_index_mutex);
+  pthread_mutex_unlock(&g_blocks_hash_index_mutex);
 end:
   return retval;
 }
@@ -365,9 +365,9 @@ int read_block_content(uint32_t query_id, const char *logical_block_path,
     }
   }
 
-close_file:
   if (file)
     fclose(file);
+
 end:
   return retval;
 }
@@ -412,8 +412,11 @@ int get_current_physical_block(uint32_t query_id,
     }
 
     // Construir la ruta completa al bloque físico actual
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wformat-truncation"
     snprintf(physical_block_path, sizeof(physical_block_path), "%s/%s",
              physical_blocks_path, entry->d_name);
+    #pragma GCC diagnostic pop
 
     // Obtener el stat del archivo físico
     if (stat(physical_block_path, &physical_stat) < 0) {
