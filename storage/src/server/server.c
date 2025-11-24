@@ -25,10 +25,17 @@ void *handle_client(void *arg) {
   while (true) {
     t_package *request = package_receive(client_socket);
     if (!request) {
+      // Resta el worker que se desconecta
+      pthread_mutex_lock(&g_worker_counter_mutex);
+      g_worker_counter--;
+      pthread_mutex_unlock(&g_worker_counter_mutex);
+
       log_error(g_storage_logger,
-                "Error en la recepción de la solicitud del Worker");
+                "## Se desconecta el Worker %s. - Cantidad de workers: %d", client_data->client_id, g_worker_counter);
       goto cleanup;
     }
+
+    usleep(g_storage_config->operation_delay * 1000);
 
     t_package *response;
     switch (request->operation_code) {

@@ -170,6 +170,8 @@ int read_from_logical_block(uint32_t query_id, const char *file_name,
     goto end;
   }
 
+  usleep(g_storage_config->block_access_delay * 1000);
+
   size_t bytes_leidos = fread(read_buffer, 1, g_storage_config->block_size, block_file);
   
   if (bytes_leidos != g_storage_config->block_size) {
