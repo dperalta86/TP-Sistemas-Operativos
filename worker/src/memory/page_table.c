@@ -43,9 +43,39 @@ void pt_destroy(page_table_t *pt)
     free(pt);
 }
 
-int pt_map(page_table_t *pt, uint32_t page_number, uint32_t frame)
+int pt_resize(page_table_t *pt, uint32_t new_page_count)
 {
-    pt_entry_t *entry = pt_get_entry(pt, page_number);
+    if (!pt || new_page_count == 0)
+        return -1;
+
+    if (new_page_count == pt->page_count)
+        return 0;
+
+    pt_entry_t *new_entries = realloc(pt->entries, new_page_count * sizeof(pt_entry_t));
+    if (!new_entries)
+        return -1;
+
+    if (new_page_count > pt->page_count)
+    {
+        for (uint32_t i = pt->page_count; i < new_page_count; i++)
+        {
+            new_entries[i].page_number = i;
+            new_entries[i].frame = 0;
+            new_entries[i].dirty = false;
+            new_entries[i].present = false;
+            new_entries[i].last_access_time = 0;
+            new_entries[i].use_bit = false;
+        }
+    }
+
+    pt->entries = new_entries;
+    pt->page_count = new_page_count;
+    return 0;
+}
+
+int pt_map(page_table_t *page_table, uint32_t page_number, uint32_t frame)
+{
+    pt_entry_t *entry = pt_get_entry(page_table, page_number);
     if (!entry)
         return -1;
 

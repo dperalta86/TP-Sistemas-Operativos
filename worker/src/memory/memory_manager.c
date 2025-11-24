@@ -196,6 +196,18 @@ void mm_remove_page_table(memory_manager_t *mm, char *file, char *tag)
     }
 }
 
+int mm_resize_page_table(memory_manager_t *mm, char *file, char *tag, uint32_t new_page_count)
+{
+    if (!mm || !file || !tag)
+        return -1;
+
+    page_table_t *pt = mm_find_page_table(mm, file, tag);
+    if (!pt)
+        return -1;
+
+    return pt_resize(pt, new_page_count);
+}
+
 bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag)
 {
     return mm_find_page_table(mm, file, tag) != NULL;
@@ -203,8 +215,14 @@ bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag)
 
 int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t page_number)
 {
-    if (!mm || !pt || !file || !tag || page_number >= pt->page_count)
+    if (!mm || !pt || !file || !tag)
         return -1;
+
+    if (page_number >= pt->page_count)
+    {
+        if (pt_resize(pt, page_number + 1) != 0)
+            return -1;
+    }
 
     if (mm->storage_socket == -1 || mm->worker_id == -1)
         return -1;
@@ -302,8 +320,13 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
 
     while (remaining > 0)
     {
+        // Expandir la tabla de páginas si es necesario
         if (current_page >= pt->page_count)
-            return -1;
+        {
+            uint32_t new_page_count = current_page + 1;
+            if (pt_resize(pt, new_page_count) != 0)
+                return -1;
+        }
 
         usleep(mm->memory_retardation * 1000);
         pt_entry_t *entry = &pt->entries[current_page];

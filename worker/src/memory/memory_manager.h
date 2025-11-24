@@ -61,6 +61,7 @@ void mm_set_query_id(memory_manager_t *mm, int query_id);
 page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag);
 page_table_t *mm_create_page_table(memory_manager_t *mm, char *file, char *tag);
 void mm_remove_page_table(memory_manager_t *mm, char *file, char *tag);
+int mm_resize_page_table(memory_manager_t *mm, char *file, char *tag, uint32_t new_page_count);
 
 int mm_write_to_memory(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t base_address, const void *data, size_t size);
 int mm_read_from_memory(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t base_address, size_t size, void *out_buffer);
