@@ -8,7 +8,7 @@
 #include "../../helpers/test_helpers.h"
 
 Test(initialization, create_master_config_valid) {
-    t_master_config *config = create_master_config("test_configs/valid.config");
+    t_master_config *config = create_master_config("criterion/unit/test_configs/valid.config");
     cr_assert_not_null(config);
     cr_assert_str_eq(config->ip, "127.0.0.1");
     cr_assert_str_eq(config->port, "9001");

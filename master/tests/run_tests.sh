@@ -35,12 +35,13 @@ run_test() {
 # Unit tests
 run_test "Initialization" "./criterion/unit/test_initialization"
 run_test "Query Management" "./criterion/unit/test_query_management"
+run_test "Worker Management" "./criterion/unit/test_worker_management"
 run_test "Cleanup" "./criterion/unit/test_cleanup"
 
-# Scheduler tests (si existen)
-if [ -f "./criterion/scheduler/test_scheduler_fifo" ]; then
-    run_test "Scheduler FIFO" "./criterion/scheduler/test_scheduler_fifo"
-fi
+# Scheduler tests
+run_test "Scheduler FIFO" "./criterion/scheduler/test_scheduler_fifo"
+run_test "Scheduler PRIORITY" "./criterion/scheduler/test_scheduler_priority"
+run_test "Aging" "./criterion/scheduler/test_aging"
 
 # Resumen
 echo -e "\n${BLUE}╔════════════════════════════════════════╗${NC}"
