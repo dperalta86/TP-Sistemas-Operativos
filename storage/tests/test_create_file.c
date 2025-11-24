@@ -33,12 +33,17 @@ context(test_create_file) {
           before{
             create_test_storage_config("9090", "90", "true", TEST_MOUNT_POINT, 1000, 5000, "INFO");
             create_test_superblock(TEST_MOUNT_POINT);
-            
+
             char config_path[PATH_MAX];
             snprintf(config_path, sizeof(config_path), "%s/storage.config", TEST_MOUNT_POINT);
             g_storage_config = create_storage_config(config_path);
 
             init_storage(TEST_MOUNT_POINT);
+          } end
+
+            after{
+            destroy_storage_config(g_storage_config);
+            g_storage_config = NULL;
           } end
 
             it("crea archivo nuevo con tag correctamente") {
