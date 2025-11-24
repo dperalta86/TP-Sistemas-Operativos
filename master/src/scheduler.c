@@ -61,6 +61,8 @@ int try_dispatch(t_master *master) {
     worker->state = WORKER_STATE_BUSY;
     query->state = QUERY_STATE_RUNNING;
 
+    query->assigned_worker_id = worker->worker_id;
+
     // Mover a las listas activas
     list_add(master->queries_table->running_list, query);
     list_add(master->workers_table->busy_list, worker);
