@@ -45,12 +45,18 @@ run_test "Scheduler FIFO" "./criterion/scheduler/test_scheduler_fifo"
 run_test "Scheduler PRIORITY" "./criterion/scheduler/test_scheduler_priority"
 run_test "Aging" "./criterion/scheduler/test_aging"
 
+# Concurrency tests
+run_test "Simple aging" "./criterion/concurrency/test_aging_simple"
+run_test "Aging concurrent" "./criterion/concurrency/test_aging_concurrent"
+run_test "Deadlock detection" "./criterion/concurrency/test_deadlock_detection"
+run_test "Scheduler integration" "./criterion/concurrency/test_scheduler_integration"
+
 # Resumen
 echo -e "\n${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║            Test Summary                ║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════╣${NC}"
-echo -e "${BLUE}║${NC} Total:  ${TOTAL}                              ${BLUE}║${NC}"
-echo -e "${BLUE}║${NC} Passed: ${GREEN}${PASSED}${NC}                              ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC} Total:  ${TOTAL}                             ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC} Passed: ${GREEN}${PASSED}${NC}                             ${BLUE}║${NC}"
 echo -e "${BLUE}║${NC} Failed: ${RED}${FAILED}${NC}                              ${BLUE}║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 
