@@ -161,7 +161,5 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         return QUERY_RESULT_END;
     }
 
-    usleep(state->config->memory_retardation * 1000);
-
     return QUERY_RESULT_OK;
 }

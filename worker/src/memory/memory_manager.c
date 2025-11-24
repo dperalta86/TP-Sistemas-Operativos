@@ -328,7 +328,6 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
                 return -1;
         }
 
-        usleep(mm->memory_retardation * 1000);
         pt_entry_t *entry = &pt->entries[current_page];
         if (!entry->present)
         {

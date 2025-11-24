@@ -250,9 +250,12 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case READ: {
-            page_table_t *page_table = mm_create_page_table(memory_manager, instruction->read.file, instruction->read.tag);
+            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->read.file, instruction->read.tag);
             if (page_table == NULL) {
-                return -1;
+                page_table = mm_create_page_table(memory_manager, instruction->read.file, instruction->read.tag);
+                if (page_table == NULL) {
+                    return -1;
+                }
             }
             uint8_t *buffer = malloc(instruction->read.size);
             if (buffer == NULL) {
