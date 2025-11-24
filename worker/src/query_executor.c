@@ -107,6 +107,8 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         return QUERY_RESULT_ERROR;
     }
 
+    log_info(state->logger, "## Query %d: FETCH Program Counter: %d %s", ctx->query_id, ctx->program_counter, raw_instruction);
+
     instruction_t *instruction = malloc(sizeof(instruction_t));
     if (decode_instruction(raw_instruction, instruction) < 0)
     {
@@ -128,6 +130,8 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         free(raw_instruction);
         return QUERY_RESULT_ERROR;
     }
+
+    log_info(state->logger, "## Query %d: Instrucción realizada: %s", ctx->query_id, raw_instruction);
 
     free(raw_instruction);
     *next_pc = ctx->program_counter + 1;
