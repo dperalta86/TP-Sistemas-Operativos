@@ -33,10 +33,10 @@ echo "--------------------------------------"
 echo "Creando superblock"
 echo "--------------------------------------"
 
-MOUNT_POINT=$(grep "^MOUNT_POINT=" "$CONFIG_PATH" | cut -d '=' -f2)
+MOUNT_POINT=$(grep "^MOUNT_POINT=" "$CONFIG_FILE" | cut -d '=' -f2)
 
 if [ -z "$MOUNT_POINT" ]; then
-    echo "ERROR: No se encontró MOUNT_POINT en $CONFIG_PATH"
+    echo "ERROR: No se encontró MOUNT_POINT en $CONFIG_FILE"
     exit 1
 fi
 
