@@ -15,7 +15,7 @@ RETARDO_MEMORIA="$3"
 ALGORITMO_REEMPLAZO="$4"
 
 if [ -z "$WORKER_ID" ]; then
-    echo "Uso: ./<script> <id_worker>"
+    echo "Uso: $0 <id_worker>"
     exit 1
 fi
 
