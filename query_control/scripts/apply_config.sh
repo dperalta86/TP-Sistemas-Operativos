@@ -5,7 +5,7 @@ SCRIPT="$2"
 PRIORIDAD="$3"
 
 if [ -z "$QC_ID" ]; then
-    echo "Uso: ./<script> <query_control_id> <script> <prioridad>"
+    echo "Uso: $0 <query_control_id> <script> <prioridad>"
     exit 1
 fi
 
@@ -17,7 +17,7 @@ fi
 CONFIG_PATH="./src/config/query_control.config"
 
 echo "--------------------------------------"
-echo "Ejecutando QUERY_CONTROL: $SCRIPT
+echo "Ejecutando QUERY_CONTROL: $SCRIPT"
 echo "--------------------------------------"
 
 ./bin/query_control "$CONFIG_PATH" "$SCRIPT" "$PRIORIDAD"

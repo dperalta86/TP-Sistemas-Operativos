@@ -11,6 +11,6 @@ for i in $(seq 1 4); do
     PRIORIDAD=20   
 
     for j in $(seq 1 25); do
-        "$SCRIPT_PATH" "$QC_ID" "$SCRIPT" "$PRIORIDAD"
+        "$SCRIPT_PATH" "$QC_ID" "$SCRIPT" "$PRIORIDAD" &
     done
 done
