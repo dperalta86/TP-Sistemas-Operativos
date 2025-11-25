@@ -72,6 +72,8 @@ void *mm_get_frame_address(memory_manager_t *mm, uint32_t frame);
 pt_entry_t *mm_get_dirty_pages(memory_manager_t *mm, char *file, char *tag, size_t *count);
 bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag);
 void mm_mark_all_clean(memory_manager_t *mm, char *file, char *tag);
+int mm_flush_query(memory_manager_t *mm, char *file, char *tag);
+int mm_flush_all_dirty(memory_manager_t *mm);
 int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t page_number);
 
 int mm_find_lru_victim(memory_manager_t *mm);
