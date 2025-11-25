@@ -28,3 +28,15 @@ fi
 sed -i "s|^IP_ESCUCHA=.*|IP_ESCUCHA=${IP_ESCUCHA}|" "$CONFIG_FILE"
 
 echo "Archivo master.config actualizado correctamente."
+
+echo "--------------------------------------"
+echo "Compilando módulo MASTER..."
+echo "--------------------------------------"
+
+make clean all
+if [ $? -ne 0 ]; then
+    echo "Error en la compilación."
+    exit 1
+fi
+
+echo "Compilación exitosa."

@@ -30,18 +30,6 @@ echo "   ALGORITMO_PLANIFICACION=$ALGORITMO"
 echo "   TIEMPO_AGING=$AGING"
 
 echo "--------------------------------------"
-echo "Compilando módulo MASTER..."
-echo "--------------------------------------"
-
-make clean all
-if [ $? -ne 0 ]; then
-    echo "Error en la compilación."
-    exit 1
-fi
-
-echo "Compilación exitosa."
-
-echo "--------------------------------------"
 echo "Ejecutando MASTER..."
 echo "--------------------------------------"
 

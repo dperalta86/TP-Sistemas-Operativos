@@ -18,12 +18,7 @@ if [ ! -f "$SCRIPT_PATH" ]; then
     exit 1
 fi
 
-# Validar permisos de ejecución
-if [ ! -x "$SCRIPT_PATH" ]; then
-    echo "ERROR: El script existe pero no tiene permisos de ejecución."
-    echo "     Ejecutá: chmod +x $SCRIPT_PATH"
-    exit 1
-fi
+chmod +x "$SCRIPT_PATH"
 
 # Ejecutar el script y pasarle los parámetros restantes
-"$SCRIPT_PATH" "${@:2}"
+"$SCRIPT_PATH"
