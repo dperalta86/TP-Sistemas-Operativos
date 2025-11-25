@@ -23,13 +23,13 @@ void *master_listener_thread(void *arg)
 
         switch (pkg->operation_code)
         {
-        case OP_ASSIGN_QUERY:
+        case OP_WORKER_START_QUERY:
         {
             assign_query(pkg, state);
             break;
         }
 
-        case OP_EJECT_QUERY:
+        case OP_WORKER_PREEMPT_REQ:
         {
             eject_query(pkg, state);
             break;
@@ -73,6 +73,7 @@ static void assign_query(t_package *pkg, worker_state_t *state)
     mm_set_query_id(state->memory_manager, query_id);
 
     pthread_mutex_unlock(&state->mux);
+    log_debug(state->logger, "Se recibe Query");
     pthread_cond_signal(&state->new_query_cond);
 
     log_info(state->logger, "## Query %d: Se recibe la Query. El path de operaciones es: %s", query_id, path);

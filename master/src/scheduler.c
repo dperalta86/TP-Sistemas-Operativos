@@ -139,7 +139,21 @@ int send_query_to_worker(t_master *master, t_worker_control_block *worker, t_que
         return -1;
     }
 
-    // Agrego un string al buffer con el path de la query
+    // Agrego query ID, PC y path
+    if (package_add_uint32(package_send_query, query->query_id) != true) {
+        log_error(master->logger, "[send_query_to_worker] Error al agregar id (%d) de Query al paquete para Worker ID=%d.",
+                  query->query_id, worker->worker_id);
+        package_destroy(package_send_query);
+        return -1;
+    }
+
+    if (package_add_uint32(package_send_query, query->program_counter) != true) {
+        log_error(master->logger, "[send_query_to_worker] Error al agregar path de Query ID=%d al paquete para Worker ID=%d.",
+                  query->query_id, worker->worker_id);
+        package_destroy(package_send_query);
+        return -1;
+    }
+
     if (package_add_string(package_send_query, query->query_file_path) != true) {
         log_error(master->logger, "[send_query_to_worker] Error al agregar path de Query ID=%d al paquete para Worker ID=%d.",
                   query->query_id, worker->worker_id);

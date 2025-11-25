@@ -1,0 +1,4 @@
+TAG initial_file:BASE initial_file:V1
+COMMIT initial_file:V1
+TAG initial_file:V1 initial_file:BASE
+END

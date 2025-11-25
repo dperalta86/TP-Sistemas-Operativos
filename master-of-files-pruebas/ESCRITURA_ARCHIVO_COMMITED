@@ -1,0 +1,7 @@
+CREATE metroid:v1
+TRUNCATE metroid:v1 512
+WRITE metroid:v1 0 SAMUS
+COMMIT metroid:v1
+WRITE metroid:v1 10 Zeebes
+FLUSH metroid:v1
+END

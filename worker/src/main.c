@@ -32,13 +32,8 @@ int main(int argc, char *argv[])
     int socket_master = -1;
     memory_manager_t *mm = NULL;
 
-    /* Handshake con Storage y Master */
     socket_storage = handshake_with_storage(config->storage_ip, config->storage_port, worker_id);
     if (socket_storage < 0)
-        goto cleanup;
-
-    socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
-    if (socket_master < 0)
         goto cleanup;
 
     /* Obtener tamaño de bloque */
@@ -68,6 +63,10 @@ int main(int argc, char *argv[])
 
     mm_set_storage_connection(mm, socket_storage, worker_id);
 
+    socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
+    if (socket_master < 0)
+        goto cleanup;
+        
     /* Crear estado global */
     worker_state_t state = {
         .has_query = false,
