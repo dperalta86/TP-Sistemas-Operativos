@@ -52,7 +52,6 @@ void *query_executor_thread(void *arg)
             state->has_query = false;
             state->is_executing = false;
             log_info(state->logger, "## Query %d: %s", ctx.query_id, (result == QUERY_RESULT_END ? "Finalizada" : "Abortada"));
-
         }
 
         pthread_mutex_unlock(&state->mux);
@@ -89,7 +88,15 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
     pthread_mutex_unlock(&state->mux);
     if (eject_before_fetch)
     {
-        log_info(state->logger, "## Query %d: Desalojada por pedido de Master", ctx->query_id);
+        mm_flush_all_dirty(state->memory_manager);
+
+        t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
+        package_add_uint32(res, ctx->query_id);
+        package_add_uint32(res, ctx->program_counter);
+        package_send(res, state->master_socket);
+        package_destroy(res);
+
+        log_info(state->logger, "## Query %d: Desalojada por pedido del Master", ctx->query_id);
         return QUERY_RESULT_EJECT;
     }
 
@@ -99,6 +106,8 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         log_error(state->logger, "## Query %d: Error en FETCH - PC: %d", ctx->query_id, ctx->program_counter);
         return QUERY_RESULT_ERROR;
     }
+
+    log_info(state->logger, "## Query %d: FETCH Program Counter: %d %s", ctx->query_id, ctx->program_counter, raw_instruction);
 
     instruction_t *instruction = malloc(sizeof(instruction_t));
     if (decode_instruction(raw_instruction, instruction) < 0)
@@ -122,16 +131,27 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         return QUERY_RESULT_ERROR;
     }
 
+    log_info(state->logger, "## Query %d: Instrucción realizada: %s", ctx->query_id, raw_instruction);
+
     free(raw_instruction);
     *next_pc = ctx->program_counter + 1;
-    
+
     pthread_mutex_lock(&state->mux);
     bool eject_after_execute = state->ejection_requested;
     pthread_mutex_unlock(&state->mux);
-    
+
     if (eject_after_execute)
     {
-        log_info(state->logger, "## Query %d: Desalojada por pedido de Master", ctx->query_id);
+        // Flush de todos los File:Tag modificados antes del desalojo
+        mm_flush_all_dirty(state->memory_manager);
+
+        t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
+        package_add_uint32(res, ctx->query_id);
+        package_add_uint32(res, ctx->program_counter);
+        package_send(res, state->master_socket);
+        package_destroy(res);
+
+        log_info(state->logger, "## Query %d: Desalojada por pedido del Master - PC=%d", ctx->query_id, ctx->program_counter);
         return QUERY_RESULT_EJECT;
     }
 
@@ -140,8 +160,6 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         *next_pc = -1;
         return QUERY_RESULT_END;
     }
-    
-    usleep(state->config->memory_retardation * 1000);
 
     return QUERY_RESULT_OK;
 }

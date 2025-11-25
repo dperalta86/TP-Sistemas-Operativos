@@ -22,6 +22,7 @@ typedef struct {
 
 page_table_t *pt_create(uint32_t page_count, size_t page_size);
 void pt_destroy(page_table_t *page_table);
+int pt_resize(page_table_t *page_table, uint32_t new_page_count);
 
 int pt_map(page_table_t *page_table, uint32_t page_number, uint32_t frame);
 

@@ -73,8 +73,9 @@ static void assign_query(t_package *pkg, worker_state_t *state)
     mm_set_query_id(state->memory_manager, query_id);
 
     pthread_mutex_unlock(&state->mux);
+    pthread_cond_signal(&state->new_query_cond);
 
-    log_info(state->logger, "## Se asignó Query %d - Program Counter=%d - Ruta=%s", query_id, program_counter, path);
+    log_info(state->logger, "## Query %d: Se recibe la Query. El path de operaciones es: %s", query_id, path);
     free(path);
 }
 
@@ -85,8 +86,25 @@ static void eject_query(t_package *pkg, worker_state_t *state)
         return;
 
     pthread_mutex_lock(&state->mux);
-    if (state->has_query && state->current_query.query_id == query_id)
-        state->should_stop = true;
+    if (state->has_query && state->current_query.query_id == query_id) {
+        if (state->is_executing) {
+            state->ejection_requested = true;
+        } else {
+            state->has_query = false;
+            int pc = state->current_query.program_counter;
+            pthread_mutex_unlock(&state->mux);
+
+            mm_flush_all_dirty(state->memory_manager);
+            
+            t_package *resp = package_create_empty(OP_WORKER_EVICT_RES);
+            package_add_uint32(resp, query_id);
+            package_add_uint32(resp, pc);
+            package_send(resp, state->master_socket);
+            package_destroy(resp);
+            log_info(state->logger, "## Query %d: Desalojada en READY, PC=%d", query_id, pc);
+            return;
+        }
+    }
     pthread_mutex_unlock(&state->mux);
 
     log_info(state->logger, "## Se recibió solicitud de desalojo para Query %d", query_id);
