@@ -53,10 +53,9 @@ void unlock_file(const char *name, const char *tag) {
   fm->ref_count--;
 
   if (fm->ref_count == 0) {
-    dictionary_remove(g_open_files_dict, key);
-    pthread_rwlock_destroy(&fm->mutex);
-
-    free(fm);
+    t_file_mutex *removed_fm = dictionary_remove(g_open_files_dict, key);
+    pthread_rwlock_destroy(&removed_fm->mutex);
+    free(removed_fm);
   }
 
   pthread_mutex_unlock(&g_storage_open_files_dict_mutex);
