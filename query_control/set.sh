@@ -35,3 +35,15 @@ set_config_value "IP_MASTER" "$IP_MASTER"
 
 echo "Archivo actualizado:"
 cat "$CONFIG_FILE"
+
+echo "--------------------------------------"
+echo "Compilando módulo QUERY_CONTROL"
+echo "--------------------------------------"
+
+make clean all
+if [ $? -ne 0 ]; then
+    echo "Error en la compilación."
+    exit 1
+fi
+
+echo "Compilación exitosa."

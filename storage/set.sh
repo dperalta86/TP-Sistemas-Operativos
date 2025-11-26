@@ -28,3 +28,43 @@ fi
 sed -i "s|^STORAGE_IP=.*|STORAGE_IP=${STORAGE_IP}|" "$CONFIG_FILE"
 
 echo "Archivo storage.config actualizado correctamente."
+
+echo "--------------------------------------"
+echo "Creando superblock"
+echo "--------------------------------------"
+
+MOUNT_POINT=$(grep "^MOUNT_POINT=" "$CONFIG_FILE" | cut -d '=' -f2)
+
+if [ -z "$MOUNT_POINT" ]; then
+    echo "ERROR: No se encontró MOUNT_POINT en $CONFIG_FILE"
+    exit 1
+fi
+
+# Crear carpeta por si no existe
+mkdir -p "$MOUNT_POINT"
+
+# Ruta del archivo superblock
+SUPERBLOCK_PATH="$MOUNT_POINT/superblock.config"
+
+echo "Creando superblock en: $SUPERBLOCK_PATH"
+
+# Crear o sobrescribir el archivo
+cat > "$SUPERBLOCK_PATH" <<EOF
+FS_SIZE=65536
+BLOCK_SIZE=16
+EOF
+
+echo "Superblock creado:"
+cat "$SUPERBLOCK_PATH"
+
+echo "--------------------------------------"
+echo "Compilando módulo STORAGE"
+echo "--------------------------------------"
+
+make clean all
+if [ $? -ne 0 ]; then
+    echo "Error en la compilación."
+    exit 1
+fi
+
+echo "Compilación exitosa."
