@@ -204,6 +204,10 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
     }
 
     // TODO: Sacar de READY queue y limpiar recursos
+    pthread_mutex_lock(&master->queries_table->query_table_mutex);
+    qcb->state = QUERY_STATE_COMPLETED;
+    list_remove_element(master->queries_table->ready_queue, qcb);
+    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
     
     // Responder ACK al Worker
     t_package *ack = package_create_empty(OP_WORKER_ACK);
