@@ -238,8 +238,6 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     if (frame == -1)
         return -1;
 
-    mm->frame_table.frames[frame].used = true;
-
     uint32_t block_number = page_number;
 
     void *data = NULL;
@@ -439,6 +437,8 @@ int mm_allocate_frame(memory_manager_t *mm)
                  mm->query_id, mm->frame_table.frame_count);
     }
 
+    int victim_frame = -1;
+
     if (mm->policy == LRU)
     {
         int victim_frame = mm_find_lru_victim(mm);
@@ -449,6 +449,7 @@ int mm_allocate_frame(memory_manager_t *mm)
                 log_info(logger, "## Query %d: Frame %d liberado usando algoritmo LRU",
                          mm->query_id, victim_frame);
             }
+            mm->frame_table.frames[victim_frame].used = true;
             return victim_frame;
         }
     }
@@ -464,7 +465,7 @@ int mm_allocate_frame(memory_manager_t *mm)
                          mm->query_id,
                          victim_frame);
             }
-
+            mm->frame_table.frames[victim_frame].used = true;
             return victim_frame;
         }
     }
