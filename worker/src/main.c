@@ -10,11 +10,13 @@
 #include <connections/storage.h>
 #include "worker_listener.h"
 #include "query_executor.h"
-#include "worker.h"
+#include "worker..h"
+#include <strings.h>
 
 static void validate_arguments(int argc, char *argv[], char **config_path, int *worker_id);
 static t_worker_config *initialize_config(char *config_path);
 static void initialize_logger(const t_worker_config *config);
+static pt_replacement_t parse_replacement_algorithm(const char *algorithm);
 
 int main(int argc, char *argv[])
 {
@@ -52,10 +54,11 @@ int main(int argc, char *argv[])
     config->block_size = block_size;
     log_info(logger, "## Tamaño de bloque recibido: %d", config->block_size);
 
+    pt_replacement_t replacement_algo = parse_replacement_algorithm(config->replacement_algorithm);
     mm = mm_create(
         config->memory_size,
         config->block_size,
-        (pt_replacement_t)config->replacement_algorithm, config->memory_retardation);
+        replacement_algo, config->memory_retardation);
 
     if (!mm)
     {
@@ -152,5 +155,22 @@ static void initialize_logger(const t_worker_config *config)
     {
         fprintf(stderr, "Error: No se pudo inicializar el sistema de logging\n");
         exit(EXIT_FAILURE);
+    }
+}
+
+static pt_replacement_t parse_replacement_algorithm(const char *algorithm)
+{
+    if (strcasecmp(algorithm, "LRU") == 0)
+    {
+        return LRU;
+    }
+    else if (strcasecmp(algorithm, "CLOCK_M") == 0 || strcasecmp(algorithm, "CLOCK-M") == 0)
+    {
+        return CLOCK_M;
+    }
+    else
+    {
+        fprintf(stderr, "Error: Algoritmo de reemplazo desconocido '%s'. Usando LRU por defecto.\n", algorithm);
+        return LRU;
     }
 }
