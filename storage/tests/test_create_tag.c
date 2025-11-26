@@ -51,7 +51,7 @@ context(test_create_tag) {
     it("crea tag exitosamente copiando desde tag existente") {
       _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
 
-      int result = create_tag(2, "test_file", "v1", "v2");
+      int result = create_tag(2, "test_file", "v1", "test_file", "v2");
       should_int(result) be equal to(0);
 
       char tag_dir[PATH_MAX];
@@ -78,7 +78,7 @@ context(test_create_tag) {
       save_file_metadata(src_metadata);
       destroy_file_metadata(src_metadata);
 
-      int result = create_tag(2, "test_file", "v1", "v2");
+      int result = create_tag(2, "test_file", "v1", "test_file", "v2");
       should_int(result) be equal to(0);
 
       t_file_metadata *dst_metadata =
@@ -94,7 +94,7 @@ context(test_create_tag) {
       _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
       _create_file(2, "test_file", "v2", TEST_MOUNT_POINT);
 
-      int result = create_tag(3, "test_file", "v1", "v2");
+      int result = create_tag(3, "test_file", "v1", "test_file", "v2");
       should_int(result) be equal to(FILE_TAG_ALREADY_EXISTS);
     }
     end
@@ -102,7 +102,7 @@ context(test_create_tag) {
     it("retorna error cuando el tag origen no existe") {
       _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
 
-      int result = create_tag(4, "test_file", "nonexistent", "v2");
+      int result = create_tag(4, "test_file", "nonexistent", "test_file", "v2");
       should_int(result) be equal to(-2);
     }
     end
@@ -110,7 +110,7 @@ context(test_create_tag) {
     it("copia estructura completa incluyendo logical_blocks") {
       _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
 
-      int result = create_tag(2, "test_file", "v1", "v2");
+      int result = create_tag(2, "test_file", "v1", "test_file", "v2");
       should_int(result) be equal to(0);
 
       char dst_blocks_dir[PATH_MAX];
