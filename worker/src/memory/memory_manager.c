@@ -437,8 +437,6 @@ int mm_allocate_frame(memory_manager_t *mm)
                  mm->query_id, mm->frame_table.frame_count);
     }
 
-    int victim_frame = -1;
-
     if (mm->policy == LRU)
     {
         int victim_frame = mm_find_lru_victim(mm);

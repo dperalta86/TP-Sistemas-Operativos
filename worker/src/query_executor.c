@@ -106,8 +106,8 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
     }
 
     char *raw_instruction = NULL;
-    char path = NULL;
-    path = (char)malloc(256);
+    char *path = NULL;
+    path = (char *)malloc(256);
     strcpy(path, state->config->path_scripts);
     strcat(path, ctx->query_path);
     if (fetch_instruction(path, ctx->program_counter, &raw_instruction) < 0)

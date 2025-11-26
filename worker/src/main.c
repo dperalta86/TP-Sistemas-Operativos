@@ -10,7 +10,7 @@
 #include <connections/storage.h>
 #include "worker_listener.h"
 #include "query_executor.h"
-#include "worker..h"
+#include "worker.h"
 #include <strings.h>
 
 static void validate_arguments(int argc, char *argv[], char **config_path, int *worker_id);
