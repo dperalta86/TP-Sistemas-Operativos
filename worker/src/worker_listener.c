@@ -72,8 +72,8 @@ static void assign_query(t_package *pkg, worker_state_t *state)
 
     mm_set_query_id(state->memory_manager, query_id);
 
-    pthread_mutex_unlock(&state->mux);
     pthread_cond_signal(&state->new_query_cond);
+    pthread_mutex_unlock(&state->mux);
 
     log_info(state->logger, "## Query %d: Se recibe la Query. El path de operaciones es: %s", query_id, path);
     free(path);
