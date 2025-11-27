@@ -83,7 +83,7 @@ int end_query_in_master(int socket_master, int worker_id, int query_id)
     return -1;
 }
 
-int send_read_content_to_master(int socket_master, int query_id, void *data, size_t data_size, int worker_id)
+int send_read_content_to_master(int socket_master, int query_id, void *data, size_t data_size, char* file, char* tag, int worker_id)
 {
     t_log *logger = logger_get();
     if (socket_master < 0)
@@ -98,11 +98,13 @@ int send_read_content_to_master(int socket_master, int query_id, void *data, siz
     }
 
     t_package *request = package_create_empty(OP_WORKER_READ_MESSAGE_REQ);
-    
+
     if (request &&
         package_add_uint32(request, worker_id) &&
         package_add_uint32(request, query_id) &&
-        package_add_data(request, data, data_size))
+        package_add_data(request, data, data_size) && 
+        package_add_string(request, file) &&
+        package_add_string(request, tag))
     {
         if (package_send(request, socket_master) == 0)
         {

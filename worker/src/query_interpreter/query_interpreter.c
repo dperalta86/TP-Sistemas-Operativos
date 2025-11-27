@@ -266,7 +266,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
                 free(buffer);
                 return -1;
             }
-            int send_result = send_read_content_to_master(socket_master, query_id, buffer, instruction->read.size, worker_id);
+            int send_result = send_read_content_to_master(socket_master, query_id, buffer, instruction->read.size, instruction->read.file, instruction->read.tag, worker_id);
             if (send_result != 0) {
                 free(buffer);
                 return -1;
