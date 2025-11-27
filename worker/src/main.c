@@ -15,7 +15,7 @@
 
 static void validate_arguments(int argc, char *argv[], char **config_path, int *worker_id);
 static t_worker_config *initialize_config(char *config_path);
-static void initialize_logger(const t_worker_config *config);
+static void initialize_logger(const t_worker_config *config, int worker_id);
 static pt_replacement_t parse_replacement_algorithm(const char *algorithm);
 
 int main(int argc, char *argv[])
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     validate_arguments(argc, argv, &config_path, &worker_id);
 
     t_worker_config *config = initialize_config(config_path);
-    initialize_logger(config);
+    initialize_logger(config, worker_id);
 
     t_log *logger = logger_get();
     log_info(logger, "## Worker iniciado - ID=%d", worker_id);
@@ -147,10 +147,12 @@ static t_worker_config *initialize_config(char *config_path)
     return config;
 }
 
-static void initialize_logger(const t_worker_config *config)
+static void initialize_logger(const t_worker_config *config, int worker_id)
 {
     t_log_level log_level = log_level_from_string(config->log_level);
-    if (logger_init("worker", log_level, true) < 0)
+    char *process_name;
+    asprintf(&process_name, "worker_%d", worker_id);
+    if (logger_init(process_name, log_level, true) < 0)
     {
         fprintf(stderr, "Error: No se pudo inicializar el sistema de logging\n");
         exit(EXIT_FAILURE);

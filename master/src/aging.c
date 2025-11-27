@@ -130,6 +130,12 @@ unlock_and_exit:
 int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return -1;
 
+    if (qcb->preemption_pending) {
+        // Ya hay un desalojo en curso para esta query
+        // No hacer nada
+        return 0;
+    }
+
     search_worker_id = qcb->assigned_worker_id;
     t_worker_control_block *worker = list_find(
         master->workers_table->worker_list,
@@ -147,11 +153,16 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
         return -1;
     }
 
+    // Marcar que hay un desalojo pendiente
+    qcb->preemption_pending = true;
+
     // Envío solicitud de desalojo, la respuesta la manejo en el worker_manager
     t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
     package_add_uint32(pkg, (uint32_t)qcb->query_id);
     package_send(pkg, worker->socket_fd);
     package_destroy(pkg);
+
+
 
     log_info(master->logger,
         "## Se desaloja la Query id: %d (<PRIORIDAD: %d>) del Worker <WORKER_ID: %d> - Motivo: <PRIORIDAD>",

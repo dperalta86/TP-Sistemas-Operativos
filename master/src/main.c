@@ -210,6 +210,10 @@ void* handle_client(void* arg) {
                     log_error(master->logger, "Error al manejar OP_WORKER_END_QUERY desde socket %d", client_socket);
                 }                
                 break;
+            case OP_WORKER_EVICT_RES:
+                log_debug(master->logger, "Recibido OP_WORKER_EVICT_RES en socket %d", client_socket);
+                manage_worker_evict_response(client_socket, required_package, master);
+                break;
             case WORKER_OP_DISCONNECTION:
                 log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);
                 handle_worker_disconnection(client_socket, master);

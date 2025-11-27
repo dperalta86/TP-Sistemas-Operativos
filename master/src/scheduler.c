@@ -68,7 +68,7 @@ int try_dispatch(t_master *master) {
     list_add(master->workers_table->busy_list, worker);
 
     log_info(master->logger,
-        "[try_dispatch] Asignada Query ID=%d al Worker ID=%d (FIFO Dispatch)",
+        "[try_dispatch] Asignada Query ID=%d al Worker ID=%d",
         query->query_id, worker->worker_id);
 
 // Enviar mensaje al worker para iniciar la ejecución de la query

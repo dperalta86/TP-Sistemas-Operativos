@@ -63,7 +63,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
  * @param socket_fd Descriptor de archivo del socket del Worker.
  * @return t_worker_control_block* Puntero al nuevo WCB creado, o NULL en caso de error.
  */
-t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, int socket_fd);
+t_worker_control_block *create_worker(t_worker_table *table, int worker_id, int socket_fd);
 
 /**
  * handler OP_WORKER_END_QUERY desde un Worker
@@ -82,5 +82,14 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
  *  - Llamar a try_dispatch
  */
 int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *master);
+
+/**
+ * @brief Maneja la respuesta de desalojo enviada por un Worker.
+ * 
+ * @param socket_fd Socket del Worker que envió la respuesta.
+ * @param package Paquete recibido con la respuesta de desalojo.
+ * @param master Puntero a la estructura del Master.
+ */
+void manage_worker_evict_response(int socket_fd, t_package *package, t_master *master);
 
 #endif

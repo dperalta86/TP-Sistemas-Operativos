@@ -95,6 +95,7 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
     qcb->assigned_worker_id = -1; // Debería ser -1 al principio (sin asignar)
     qcb->program_counter = 0; // Inicia en 0, luego lo actualiza con datos desde el Worker
     qcb->state = QUERY_STATE_READY; // Inicia en READY al ser creada
+    qcb->preemption_pending = false; // No hay desalojo pendiente al inicio
     qcb->ready_timestamp = now_ms_monotonic();
 
     // Agregamos a la lista principal y a la cola de ready (teniendo en cuenta planificador)
