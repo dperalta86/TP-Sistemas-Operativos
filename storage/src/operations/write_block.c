@@ -299,7 +299,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
 
   if (write_to_logical_block(query_id, name, tag, block_number, block_data, data_size) < 0) {
     retval = -7;
-}
+  }
 
 
   goto cleanup_unlock;
