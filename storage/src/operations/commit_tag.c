@@ -86,7 +86,7 @@ end:
 int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
   int retval = 0;
 
-  lock_file(name, tag);
+  lock_file(name, tag, false);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
