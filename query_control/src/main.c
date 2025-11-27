@@ -171,11 +171,10 @@ int main(int argc, char* argv[])
 
     switch (resp->operation_code) {
 
-        case QC_OP_READ_DATA: {
-
-            char* file_tag = package_read_string(resp);  
+        case QC_OP_READ_DATA: {    
             size_t size = 0; 
-            void* file_data = package_read_data(resp, &size);
+            void* file_data = buffer_read_data(resp->buffer, &size);
+            char* file_tag = buffer_read_string(resp->buffer);
 
             if(file_tag == NULL){
                 retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
@@ -189,23 +188,10 @@ int main(int argc, char* argv[])
                  goto clean_socket;             
             } 
 
-
-            char* contenido = malloc(size + 1);
-
-            if (!contenido) {
-                retval = fail_pkg(logger, "Memoria insuficiente al procesar READ_DATA", &resp, -7);
-                free(file_tag); free(file_data);
-                goto clean_socket;
-            }
-            memcpy(contenido, file_data, size);
-            contenido[size] = '\0';
-
-            // Estructura <File:Tag> debe venir de master en un solo string listo para logear
-            log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
+            log_info(logger, "## Lectura realizada:  <%s>, contenido: %s", file_tag, file_data);
 
             free(file_tag);
             free(file_data);
-            free(contenido);
         } break;
 
         case QC_OP_MASTER_FIN_DESCONEXION:

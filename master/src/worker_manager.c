@@ -60,6 +60,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
 
     uint32_t worker_id;
     uint32_t query_id;
+    char *file_tag;
     void *data = NULL;
     size_t size;
 
@@ -67,8 +68,11 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     buffer_read_uint32(buffer, &worker_id);
     buffer_read_uint32(buffer, &query_id);
     data = buffer_read_data(buffer, &size);
+    file_tag = buffer_read_string(buffer);
+    strcat(file_tag, ":");
+    strcat(file_tag, buffer_read_string(buffer));
 
-    log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. Data= %s", worker_id, query_id, data);
+    log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. File:Tag <%s> Data= %s", worker_id, query_id, file_tag, data);
 
     // Buscar la query correspondiente al ID
     t_query_control_block *query = NULL;
@@ -95,7 +99,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     }
 
     // Copiar el contenido del buffer recibido del Worker al nuevo paquete
-    if (!package_add_data(package_to_query, data, size)) {
+    if (!(package_add_data(package_to_query, data, size) && package_add_string(package_to_query, file_tag))) {
         log_error(master->logger, "[manage_read_message_from_worker] Error al copiar buffer de Worker ID=%d hacia Query ID=%d.",
                   worker_id, query_id);
         package_destroy(package_to_query);
@@ -115,6 +119,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
 
     // Liberar memoria
     package_destroy(package_to_query);
+    free(file_tag);
     free(data);
     return 0;
 }
