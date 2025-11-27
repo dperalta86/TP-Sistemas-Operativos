@@ -157,7 +157,7 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
 
   usleep(g_storage_config->block_access_delay * 1000);
 
-size_t block_size = g_storage_config->block_size;
+  size_t block_size = g_storage_config->block_size;
   void *buffer = calloc(1, block_size);
   if (buffer == NULL) {
     log_error(g_storage_logger,
