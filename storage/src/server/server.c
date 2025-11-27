@@ -55,7 +55,7 @@ void *handle_client(void *arg) {
       response = handle_create_tag_op_package(request);
       break;
     case STORAGE_OP_TAG_COMMIT_REQ:
-      response = commit_tag(request);
+      response = handle_tag_commit_request(request);
       break;
     case STORAGE_OP_BLOCK_WRITE_REQ:
       response = handle_write_block_request(request);

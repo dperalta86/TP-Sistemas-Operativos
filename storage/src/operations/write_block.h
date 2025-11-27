@@ -12,9 +12,6 @@
 #include "file_locks.h"
 #include "errors.h"
 
-#define IN_PROGRESS "WORK_IN_PROGRESS"
-#define COMMITTED "COMMITTED"
-
 /**
  * Maneja la solicitud de operación WRITE BLOCK recibida desde un Worker.
  * Deserializa los datos, invoca la lógica principal de escritura de bloque y

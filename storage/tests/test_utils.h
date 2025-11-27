@@ -197,4 +197,56 @@ int mutex_is_free(pthread_mutex_t *mutex);
  */
 void package_simulate_reception(t_package *package);
 
+/**
+ * Escribe el contenido de un bloque físico y lo rellena con ceros si es necesario.
+ *
+ * @param physical_id Identificador numérico del bloque físico.
+ * @param content Puntero al contenido a escribir en el bloque.
+ * @param content_size Cantidad de bytes del contenido a escribir.
+ */
+void write_physical_block_content(int physical_id, const char *content, size_t content_size);
+
+/**
+ * Asocia un bloque lógico con un bloque físico mediante un hardlink.
+ *
+ * @param name Nombre del archivo dentro del directorio de `files/`.
+ * @param tag Nombre de la etiqueta (tag) dentro del archivo.
+ * @param logical_id Número del bloque lógico que se desea vincular.
+ * @param physical_id Número del bloque físico al que debe apuntar el hardlink.
+ */
+void link_logical_to_physical(const char *name, const char *tag, int logical_id, int physical_id);
+
+/**
+ * Construye la ruta del archivo de configuración de índices hash.
+ *
+ * @param buffer Buffer donde se almacenará la ruta final. Debe tener tamaño ≥ PATH_MAX.
+ * @return char* El mismo buffer recibido como parámetro.
+ */
+char* get_hash_index_config_path(char *buffer);
+
+/**
+ * Crea el archivo inicial de índice de hashes de bloques para pruebas.
+ *
+ * @param mount_point Ruta absoluta al directorio raíz del sistema de archivos de prueba.
+ * @return int 0 en caso de éxito, -1 si el archivo no pudo crearse.
+ */
+int create_test_blocks_hash_index(const char* mount_point);
+
+/**
+ * Libera los recursos asociados a un bitmap y desbloquea el mutex global.
+ * Puede usarse en reemplazo de bitmap_persist() cuando no hay cambios que persistir.
+ *
+ * @param bitmap Puntero al t_bitarray a destruir. Puede ser NULL.
+ * @param buffer Buffer asociado al bitmap que debe ser liberado. Puede ser NULL.
+ */
+void bitmap_close(t_bitarray *bitmap, char *buffer);
+
+/**
+ * Modifica un bit del bitmap global y persiste el cambio en disco.
+ *
+ * @param bit_index Índice del bit a modificar dentro del bitmap.
+ * @param value Si es `true`, el bit se marca (1). Si es `false`, el bit se limpia (0).
+ */
+void define_bitmap_bit(off_t bit_index, bool value);
+
 #endif
