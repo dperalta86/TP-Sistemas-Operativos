@@ -8,7 +8,7 @@
 #include <fresh_start/fresh_start.h>
 #include "test_utils.h"
 #include <cspecs/cspec.h>
-#include <string.h> 
+#include <string.h>
 
 context(tests_write_block) {   
 
