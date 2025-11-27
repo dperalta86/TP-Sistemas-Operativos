@@ -68,9 +68,14 @@ int end_query_in_master(int socket_master, int worker_id, int query_id)
         package_add_uint32(request, worker_id) &&
         package_add_uint32(request, query_id))
     {
-        int result = send_request_and_wait_ack(socket_master, request, 
+/*         int result = send_request_and_wait_ack(socket_master, request, 
                                             OP_WORKER_ACK, 
-                                            "notificación de fin de query");
+                                            "notificación de fin de query"); */
+
+        // Enviar notificación sin esperar ACK
+        int result = package_send(request, socket_master);
+        package_destroy(request);
+
         if (result == 0)
         {
             log_debug(logger, "Notificación de fin de query enviada y confirmada por Master");

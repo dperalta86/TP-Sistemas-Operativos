@@ -6,6 +6,7 @@
 #include "scheduler.h"
 #include <commons/collections/list.h>
 #include <unistd.h>
+#include "disconnection_handler.h"
 
 
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master) {
@@ -296,6 +297,12 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
     buffer_read_uint32(buffer, &worker_id);
     buffer_read_uint32(buffer, &query_id);
 
+    // IMPORTANTE: Bloquear AMBOS mutexes en ORDEN para evitar deadlock
+    // Siempre: workers primero, luego queries
+    pthread_mutex_lock(&master->workers_table->worker_table_mutex);
+    pthread_mutex_lock(&master->queries_table->query_table_mutex);
+
+    // Buscar el worker
     t_worker_control_block *worker = NULL;
     for (int i = 0; i < list_size(master->workers_table->worker_list); i++) {
         t_worker_control_block *aux = list_get(master->workers_table->worker_list, i);
@@ -306,10 +313,22 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
     }
 
     if (worker == NULL) {
-        log_error(master->logger, "[manage_worker_end_query] No se encontró worker para socket=%d (worker_id=%u).", client_socket, worker_id);        return -1;
+        log_error(master->logger, 
+                  "[manage_worker_end_query] No se encontró worker para socket=%d (worker_id=%u).", 
+                  client_socket, worker_id);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+        return -1;
     }
 
-    // Buscar la query en la running_list
+/*     // Responder ACK al Worker
+    t_package *ack = package_create_empty(OP_WORKER_ACK);
+    if (ack) {
+        package_send(ack, client_socket);
+        package_destroy(ack);
+    } */
+
+    // Buscar la query en la running_list (NO en ready_queue)
     t_query_control_block *qcb = NULL;
     for (int i = 0; i < list_size(master->queries_table->running_list); i++) {
         t_query_control_block *aux = list_get(master->queries_table->running_list, i);
@@ -320,10 +339,16 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
     }
 
     if (qcb == NULL) {
-        log_error(master->logger, "[manage_worker_end_query] No se encontró Query ID=%u en RUNNING (Worker ID=%u).", query_id, worker->worker_id);
-        // Marcar worker IDLE por seguridad
+        log_error(master->logger, 
+                  "[manage_worker_end_query] No se encontró Query ID=%u en RUNNING (Worker ID=%u).", 
+                  query_id, worker->worker_id);
+        
+        // Liberar worker por seguridad
         worker->state = WORKER_STATE_IDLE;
         worker->current_query_id = -1;
+        
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
         return -1;
     }
 
@@ -332,39 +357,50 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
              "## Se terminó la Query %d en el Worker %d",
              qcb->query_id, worker->worker_id);
 
+    // Actualizar estado de la query
+    qcb->state = QUERY_STATE_COMPLETED;
+    qcb->assigned_worker_id = -1;
+    
+    // Sacar de running_list (NO de ready_queue)
+    if (!list_remove_element(master->queries_table->running_list, qcb)) {
+        log_warning(master->logger, 
+                    "[manage_worker_end_query] Query ID=%d no estaba en running_list", 
+                    qcb->query_id);
+    }
+
+    // Actualizar estado del worker: BUSY → IDLE
+    worker->state = WORKER_STATE_IDLE;
+    worker->current_query_id = -1;
+    
+    // Mover de busy_list a idle_list
+    if (!list_remove_element(master->workers_table->busy_list, worker)) {
+        log_warning(master->logger, 
+                    "[manage_worker_end_query] Worker ID=%d no estaba en busy_list", 
+                    worker->worker_id);
+    }
+    list_add(master->workers_table->idle_list, worker);
+
+    // Liberar mutexes ANTES de operaciones lentas (I/O) para no tener condicion de carrera en el trydispatch
+    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+
     // Notificar al Query Control (si está conectado)
     if (qcb->socket_fd > 0) {
         t_package *resp = package_create_empty(OP_MASTER_QUERY_END);
         if (resp) {
-            package_add_uint32(resp, (uint32_t) qcb->query_id);
+            package_add_uint32(resp, (uint32_t)qcb->query_id);
             if (package_send(resp, qcb->socket_fd) != 0) {
-                log_error(master->logger, "[manage_worker_end_query] Error al enviar resultado final a QC (Query ID=%d, socket=%d).",
-                          qcb->query_id, qcb->socket_fd);
+                log_error(master->logger, 
+                          "[manage_worker_end_query] Error al enviar resultado final a QC (Query ID=%d).",
+                          qcb->query_id);
             }
             package_destroy(resp);
         }
-        close(qcb->socket_fd); // Libero el socket
+        close(qcb->socket_fd); // Cerrar conexión con QC
     }
 
-    // TODO: Sacar de READY queue y limpiar recursos
-    pthread_mutex_lock(&master->queries_table->query_table_mutex);
-    qcb->state = QUERY_STATE_COMPLETED;
-    list_remove_element(master->queries_table->ready_queue, qcb);
-    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
-    
-    // Responder ACK al Worker
-    t_package *ack = package_create_empty(OP_WORKER_ACK);
-    if (ack) {
-        package_send(ack, client_socket);
-        package_destroy(ack);
-    }
-
-    // Poner worker IDLE y limpiar current_query_id
-    pthread_mutex_lock(&master->workers_table->worker_table_mutex);
-    worker->state = WORKER_STATE_IDLE;
-    worker->current_query_id = -1;
-    list_add(master->workers_table->idle_list, worker);
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+    // Limpiar recursos de la query
+    cleanup_query_resources(qcb, master);
 
     // Intentar despachar la siguiente query
     try_dispatch(master);

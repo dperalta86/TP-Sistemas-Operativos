@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     goto clean_config;
   }
 
-  g_storage_logger = create_logger(current_directory, MODULO, false,
+  g_storage_logger = create_logger(current_directory, MODULO, true,
                                    g_storage_config->log_level);
   if (g_storage_logger == NULL) {
     fprintf(stderr, "No se pudo crear el logger\n");
