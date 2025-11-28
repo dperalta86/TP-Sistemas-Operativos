@@ -32,7 +32,35 @@ t_package *handle_read_block_request(t_package *package) {
     return NULL;
   }
 
-  if (!package_add_int8(response, (int8_t)operation_result)) {
+  // No hay concordancia con lo que espera el Worker
+  // Modifico el package que se envia a worker...
+  uint32_t data_size_to_send = 0;
+  if (operation_result == 0) {
+      data_size_to_send = (uint32_t) g_storage_config->block_size; // o el valor real devuelto por read
+  }
+
+  // Agrego el tamaño (si es 0, indica ausencia de datos).
+  if (!package_add_uint32(response, data_size_to_send)) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Error al escribir tamaño en respuesta de READ BLOCK", query_id);
+      package_destroy(response);
+      free(read_buffer);
+      return NULL;
+  }
+
+  // Si hay datos válidos, agregamos los bytes "crudos" (se convierte a string en master)
+  if (operation_result == 0 && data_size_to_send > 0) {
+      if (!package_add_data(response, read_buffer, data_size_to_send)) {
+          log_error(g_storage_logger,
+                    "## Query ID: %" PRIu32 " - Error al escribir contenido binario del bloque en respuesta.", query_id);
+          package_destroy(response);
+          free(read_buffer);
+          return NULL;
+      }
+  }
+
+
+/*   if (!package_add_int8(response, (int8_t)operation_result)) {
     log_error(g_storage_logger,
               "## Query ID: %" PRIu32 " - Error al escribir status en respuesta de READ BLOCK", query_id);
     package_destroy(response);
@@ -48,7 +76,7 @@ t_package *handle_read_block_request(t_package *package) {
             free(read_buffer);
             return NULL;
         }
-  }  
+  }   */
 
   free(read_buffer);
 
