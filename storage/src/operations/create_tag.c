@@ -2,63 +2,48 @@
 #include "../file_locks.h"
 #include <limits.h>
 
-int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
-               const char *file_dst, const char *tag_dst) {
+int create_tag(uint32_t query_id, const char *name, const char *src_tag,
+               const char *dst_tag) {
   int retval = 0;
 
   char dst_path[PATH_MAX];
-  snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
-           file_dst, tag_dst);
-  lock_file(file_dst, tag_dst, true);
+  snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point, name, dst_tag);
+  lock_file(name, dst_tag);
 
   t_file_metadata *metadata =
-      read_file_metadata(g_storage_config->mount_point, file_dst, tag_dst);
+      read_file_metadata(g_storage_config->mount_point, name, dst_tag);
   if (metadata) {
     log_error(g_storage_logger,
               "## %u - No se puede crear el tag %s:%s porque ya existe",
-              query_id, file_dst, tag_dst);
+              query_id, name, dst_tag);
     retval = FILE_TAG_ALREADY_EXISTS;
     goto end;
   }
 
-  lock_file(file_src, tag_src, false);
-
-  t_file_metadata *metadata_src =
-      read_file_metadata(g_storage_config->mount_point, file_src, tag_src);
-  if (metadata_src == NULL) {
-    log_error(g_storage_logger,
-              "## %u - El tag de origen %s:%s no existe.",
-              query_id, file_src, tag_src);
-    retval = FILE_TAG_MISSING;
-    goto end;
-  }
-
-  destroy_file_metadata(metadata_src);
-
   char src_path[PATH_MAX];
   snprintf(src_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
-           file_src, tag_src);
+           name, src_tag);
+
+  lock_file(name, src_tag);
 
   char command[PATH_MAX * 2 + 32];
-  snprintf(command, sizeof(command), "cp -rl \"%s\" \"%s\"", src_path,
-           dst_path);
+  snprintf(command, sizeof(command), "cp -rl \"%s\" \"%s\"", src_path, dst_path);
   int cmd_status_code = system(command);
 
-  unlock_file(file_src, tag_src);
+  unlock_file(name, src_tag);
 
   if (cmd_status_code != 0) {
     log_error(g_storage_logger, "## %u - No se pudo copiar de %s:%s a %s:%s",
-              query_id, file_src, tag_src, file_dst, tag_dst);
+              query_id, name, src_tag, name, dst_tag);
     retval = -2;
     goto end;
   }
 
-  metadata =
-      read_file_metadata(g_storage_config->mount_point, file_dst, tag_dst);
+  metadata = read_file_metadata(g_storage_config->mount_point, name, dst_tag);
   if (!metadata) {
     log_error(g_storage_logger,
               "## %u - No se pudo leer metadata después de copiar %s:%s",
-              query_id, file_dst, tag_dst);
+              query_id, name, dst_tag);
     retval = -3;
     goto end;
   }
@@ -70,16 +55,15 @@ int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
 
   if (save_file_metadata(metadata) != 0) {
     log_error(g_storage_logger,
-              "## %u - No se pudo guardar metadata para %s:%s", query_id,
-              file_dst, tag_dst);
+              "## %u - No se pudo guardar metadata para %s:%s", query_id, name,
+              dst_tag);
     retval = -4;
   }
 
-  log_info(g_storage_logger, "## %" PRIu32 " - Tag creado %s:%s", query_id,
-           file_dst, tag_dst);
+  log_info(g_storage_logger, "## %" PRIu32 " - Tag creado %s:%s", query_id, name, dst_tag);
 
 end:
-  unlock_file(file_dst, tag_dst);
+  unlock_file(name, dst_tag);
   if (metadata) {
     destroy_file_metadata(metadata);
   }
@@ -94,32 +78,27 @@ t_package *handle_create_tag_op_package(t_package *package) {
     return NULL;
   }
 
-  char *file_src = package_read_string(package);
-  char *tag_src = package_read_string(package);
-  char *file_dst = package_read_string(package);
-  char *tag_dst = package_read_string(package);
+  char *name = package_read_string(package);
+  char *src_tag = package_read_string(package);
+  char *dst_tag = package_read_string(package);
 
-  if (!file_src || !tag_src || !file_dst || !tag_dst) {
+  if (!name || !src_tag || !dst_tag) {
     log_error(g_storage_logger,
               "## Error al deserializar parámetros de CREATE_TAG");
-    if (file_src)
-      free(file_src);
-    if (tag_src)
-      free(tag_src);
-    if (file_dst)
-      free(file_dst);
-    if (tag_dst)
-      free(tag_dst);
+    if (name)
+      free(name);
+    if (src_tag)
+      free(src_tag);
+    if (dst_tag)
+      free(dst_tag);
     return NULL;
   }
 
-  int operation_result =
-      create_tag(query_id, file_src, tag_src, file_dst, tag_dst);
+  int operation_result = create_tag(query_id, name, src_tag, dst_tag);
 
-  free(file_src);
-  free(tag_src);
-  free(file_dst);
-  free(tag_dst);
+  free(name);
+  free(src_tag);
+  free(dst_tag);
 
   t_package *response = package_create_empty(STORAGE_OP_TAG_CREATE_RES);
   if (!response) {
