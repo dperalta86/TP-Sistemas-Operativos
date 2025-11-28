@@ -8,4 +8,5 @@ t_dictionary *g_open_files_dict = NULL;
 // semáforos
 pthread_mutex_t g_worker_counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t g_storage_bitmap_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t g_blocks_hash_index_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t g_storage_open_files_dict_mutex = PTHREAD_MUTEX_INITIALIZER;

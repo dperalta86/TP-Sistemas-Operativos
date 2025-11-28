@@ -1,23 +1,26 @@
 #include "write_block.h"
+#include <linux/limits.h>
 
 t_package *handle_write_block_request(t_package *package) {
   uint32_t query_id;
   char *name = NULL;
   char *tag = NULL;
   uint32_t block_number;
-  char *block_content = NULL;
+  size_t data_size = 0;
+  void *block_data = NULL;
 
   if (deserialize_block_write_request(package, &query_id, &name, &tag,
-                                      &block_number, &block_content) < 0) {
+                                      &block_number, &block_data,
+                                        &data_size) < 0) {
     return NULL;
   }
 
   int operation_result =
-      execute_block_write(name, tag, query_id, block_number, block_content);
+      execute_block_write(name, tag, query_id, block_number, block_data, data_size);
 
   free(name);
   free(tag);
-  free(block_content);
+  free(block_data);
 
   t_package *response = package_create_empty(STORAGE_OP_BLOCK_WRITE_RES);
   if (!response) {
@@ -42,7 +45,8 @@ t_package *handle_write_block_request(t_package *package) {
 int deserialize_block_write_request(t_package *package, uint32_t *query_id,
                                     char **name, char **tag,
                                     uint32_t *block_number,
-                                    char **block_content) {
+                                    void **block_data,
+                                    size_t *data_size) {
   int retval = 0;
 
   if (!package_read_uint32(package, query_id)) {
@@ -81,8 +85,8 @@ int deserialize_block_write_request(t_package *package, uint32_t *query_id,
     goto clean_tag;
   }
 
-  *block_content = package_read_string(package);
-  if (*block_content == NULL) {
+  *block_data = package_read_data(package, data_size);
+  if (*block_data == NULL) {
     log_error(g_storage_logger,
               "## Query ID: %d - Error al deserializar el contenido a escribir "
               "de WRITE_BLOCK",
@@ -137,7 +141,7 @@ int create_new_hardlink(uint32_t query_id, const char *name, const char *tag, ui
 
 int write_to_logical_block(uint32_t query_id, const char *file_name,
                            const char *tag, uint32_t block_number,
-                           const char *block_content) {
+                           const void *block_data, size_t data_size) {
   char logical_block_path[PATH_MAX];
   snprintf(logical_block_path, sizeof(logical_block_path),
            "%s/files/%s/%s/logical_blocks/%04d.dat",
@@ -151,9 +155,11 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
     return -1;
   }
 
-  size_t bytes_written = fwrite(block_content, sizeof(char),
-                                g_storage_config->block_size, block_file);
-  if (bytes_written != g_storage_config->block_size) {
+  usleep(g_storage_config->block_access_delay * 1000);
+
+  size_t block_size = g_storage_config->block_size;
+  void *buffer = calloc(1, block_size);
+  if (buffer == NULL) {
     log_error(g_storage_logger,
               "## Query ID: %d - Error al escribir en el bloque %s.", query_id,
               logical_block_path);
@@ -161,19 +167,35 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
     return -1;
   }
 
-  log_info(g_storage_logger, "## Query ID: %" PRIu32 " - Bloque lógico escrito %s:%s - Número de bloque: %" PRIu32, query_id, file_name, tag, block_number);
+  size_t bytes_to_copy = data_size < block_size ? data_size : block_size;
+  memcpy(buffer, block_data, bytes_to_copy);
+
+  size_t bytes_written = fwrite(buffer, 1, block_size, block_file);
+  free(buffer);
+
+  if (bytes_written != block_size) {
+    log_error(g_storage_logger,
+              "## Query ID: %d - Error al escribir en el bloque %s.", query_id,
+              logical_block_path);
+    fclose(block_file);
+    return -1;
+  }
+
+  log_info(g_storage_logger,
+           "## Query ID: %" PRIu32 " - Bloque lógico escrito %s:%s - Número de bloque: %" PRIu32,
+           query_id, file_name, tag, block_number);
 
   fclose(block_file);
   return 0;
 }
 
 int execute_block_write(const char *name, const char *tag, uint32_t query_id,
-                        uint32_t block_number, const char *block_content) {
+                        uint32_t block_number, const void *block_data, size_t data_size){
   t_bitarray *bitmap = NULL;
   char *bitmap_buffer = NULL;
   int retval = 0;
 
-  lock_file(name, tag);
+  lock_file(name, tag, true);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -275,10 +297,10 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
 
   destroy_file_metadata(metadata);
 
-  if (write_to_logical_block(query_id, name, tag, block_number, block_content) <
-      0) {
+  if (write_to_logical_block(query_id, name, tag, block_number, block_data, data_size) < 0) {
     retval = -7;
   }
+
 
   goto cleanup_unlock;
 

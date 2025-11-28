@@ -2,6 +2,7 @@
 #define STORAGE_OPERATIONS_WRITE_BLOCK_H_
 
 #include <stdio.h>
+#include <stddef.h>
 #include <commons/bitarray.h>
 #include <inttypes.h>
 #include "connection/serialization.h"
@@ -11,9 +12,6 @@
 #include "utils/filesystem_utils.h"
 #include "file_locks.h"
 #include "errors.h"
-
-#define IN_PROGRESS "WORK_IN_PROGRESS"
-#define COMMITTED "COMMITTED"
 
 /**
  * Maneja la solicitud de operación WRITE BLOCK recibida desde un Worker.
@@ -35,11 +33,12 @@ t_package *handle_write_block_request(t_package *package);
  * @param tag Tag asociada al archivo.
  * @param query_id Identificador de la consulta o petición en curso (usado para logs).
  * @param block_number Número de bloque lógico a escribir.
- * @param block_content Contenido a escribir en el bloque físico correspondiente.
- *
+ * @param block_data Puntero a los datos binarios a escribir.
+ * @param data_size Tamaño en bytes de block_data.
  * @return int 0 si la operación fue exitosa, negativo si falla
  */
-int execute_block_write(const char *name, const char *tag, uint32_t query_id, uint32_t block_number, const char *block_content);
+int execute_block_write(const char *name, const char *tag, uint32_t query_id,
+                        uint32_t block_number, const void *block_data, size_t data_size);
 
 /**
  * Escribe el contenido de un bloque en el disco, a través del hardlink lógico.
@@ -50,10 +49,13 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id, ui
  * @param file_name Nombre del archivo lógico.
  * @param tag Tag asociada al archivo.
  * @param block_number Número de bloque lógico a escribir.
- * @param block_content Contenido a escribir.
- * @return int 0 si la escritura es exitosa, -1 en caso de error de E/S.
+ * @param block_data Datos binarios a escribir.
+ * @param data_size Cantidad de bytes válidos en block_data.
+ *  * @return int 0 si la escritura es exitosa, -1 en caso de error de E/S.
  */
-int write_to_logical_block(uint32_t query_id, const char *file_name, const char *tag, uint32_t block_number, const char *block_content);
+int write_to_logical_block(uint32_t query_id, const char *file_name,
+                           const char *tag, uint32_t block_number,
+                           const void *block_data, size_t data_size);
 
 /**
  * Crea un nuevo hardlink (en la ruta lógica) que apunta a un bloque físico.
@@ -79,8 +81,12 @@ int create_new_hardlink(uint32_t query_id, const char *name, const char *tag, ui
  * @param name Puntero al puntero donde se almacenará el nombre del File (debe ser liberado).
  * @param tag Puntero al puntero donde se almacenará el Tag (debe ser liberado).
  * @param block_number Puntero donde se almacenará el número de bloque lógico.
- * @param block_content Puntero al puntero donde se almacenará el contenido (debe ser liberado).
+ * @param block_data Puntero donde se almacenará la dirección de memoria con los datos binarios (debe ser liberado).
+ * @param data_size Puntero donde se almacenará el tamaño en bytes de block_data.
  * @return int 0 si la deserialización es exitosa, -1 si falla.
  */
-int deserialize_block_write_request(t_package *package, uint32_t *query_id, char **name, char **tag, uint32_t *block_number, char **block_content);
+int deserialize_block_write_request(t_package *package, uint32_t *query_id,
+                                    char **name, char **tag,
+                                    uint32_t *block_number,
+                                    void **block_data, size_t *data_size);
 #endif

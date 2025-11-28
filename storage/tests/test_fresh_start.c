@@ -201,9 +201,16 @@ should_int(count_files_in_directory(physical_blocks_dir)) be equal
 // Verificar que existen los archivos del primer y ultimo bloque con tamaño
 // correcto
 char first_block[PATH_MAX], last_block[PATH_MAX];
-snprintf(first_block, sizeof(first_block), "%s/0000.dat", physical_blocks_dir);
-snprintf(last_block, sizeof(last_block), "%s/%04d.dat", physical_blocks_dir,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+snprintf(first_block, sizeof(first_block), "%s/block0000.dat", physical_blocks_dir);
+#pragma GCC diagnostic pop
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+snprintf(last_block, sizeof(last_block), "%s/block%04d.dat", physical_blocks_dir,
          total_blocks - 1);
+#pragma GCC diagnostic pop
 
 should_bool(file_exists(first_block)) be truthy;
 should_bool(file_exists(last_block)) be truthy;
@@ -264,7 +271,7 @@ should_ptr(strstr(metadata_content, "ESTADO=COMMITTED")) not be null;
 
 // Verificar hardlink
 char physical_block[PATH_MAX], logical_block[PATH_MAX];
-snprintf(physical_block, sizeof(physical_block), "%s/physical_blocks/0000.dat",
+snprintf(physical_block, sizeof(physical_block), "%s/physical_blocks/block0000.dat",
          TEST_MOUNT_POINT);
 snprintf(logical_block, sizeof(logical_block),
          "%s/files/initial_file/BASE/logical_blocks/0000.dat",

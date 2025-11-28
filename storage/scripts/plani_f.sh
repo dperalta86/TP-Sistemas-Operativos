@@ -1,0 +1,12 @@
+#!/bin/bash
+
+RETARDO_OPERACION=250
+RETARDO_ACCESO_BLOQUE=250
+FRESH_START=FALSE
+
+SCRIPT_PATH="./scripts/apply_config.sh"
+
+chmod +x "$SCRIPT_PATH"
+
+# Llama a apply_config.sh con los valores comunes
+"$SCRIPT_PATH" "$RETARDO_OPERACION" "$RETARDO_ACCESO_BLOQUE" "$FRESH_START"

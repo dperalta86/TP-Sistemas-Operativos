@@ -511,7 +511,6 @@ int bitmap_persist(t_bitarray *bitmap, char *bitmap_buffer) {
 
   FILE *bitmap_file = open_bitmap_file("r+b");
   if (bitmap_file == NULL) {
-    pthread_mutex_unlock(&g_storage_bitmap_mutex);
     retval = -1;
     goto end;
   }
@@ -519,8 +518,6 @@ int bitmap_persist(t_bitarray *bitmap, char *bitmap_buffer) {
   fseek(bitmap_file, 0, SEEK_SET);
 
   int written_bytes = fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file);
-
-  pthread_mutex_unlock(&g_storage_bitmap_mutex);
 
   if (written_bytes != (int)bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo escribir el bitmap modificado");
@@ -538,6 +535,7 @@ end:
     bitarray_destroy(bitmap);
   if (bitmap_buffer)
     free(bitmap_buffer);
+  pthread_mutex_unlock(&g_storage_bitmap_mutex);
   return retval;
 }
 

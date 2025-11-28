@@ -19,7 +19,7 @@
 #include <utils/utils.h>
 
 #define MODULO "STORAGE"
-#define DEFAULT_CONFIG_PATH "./storage.config"
+#define DEFAULT_CONFIG_PATH "./src/config/storage.config"
 
 int main(int argc, char *argv[]) {
   // Obtiene posibles parametros de entrada

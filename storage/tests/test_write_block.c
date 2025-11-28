@@ -8,6 +8,7 @@
 #include <fresh_start/fresh_start.h>
 #include "test_utils.h"
 #include <cspecs/cspec.h>
+#include <string.h>
 
 context(tests_write_block) {   
 
@@ -17,25 +18,41 @@ context(tests_write_block) {
             char *name = NULL;
             char *tag = NULL;
             uint32_t block_number;
-            char *block_content = NULL;
+            void *block_data = NULL;
+            size_t data_size = 0;
 
             t_package *package = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
+
+            const char *content = "TEXTO";
+            size_t content_size = strlen(content);
 
             package_add_uint32(package, 12);
             package_add_string(package, "file");
             package_add_string(package, "tag1");
             package_add_uint32(package, 21);
-            package_add_string(package, "TEXTO");
+            package_add_data(package, content, content_size);
 
             package_reset_read_offset(package);
 
-            int retval = deserialize_block_write_request(package, &query_id, &name, &tag, &block_number, &block_content);
+            int retval = deserialize_block_write_request(
+                package,
+                &query_id,
+                &name,
+                &tag,
+                &block_number,
+                &block_data,
+                &data_size
+            );
             should_int(retval) be equal to (0);
+            should_int(query_id) be equal to (12);
+            should_int(block_number) be equal to (21);
+            should_int(data_size) be equal to ((int)content_size);
+            should_bool(memcmp(block_data, content, content_size) == 0) be truthy;
 
-            if (package) free(package);
+            if (package) package_destroy(package);
             if (name) free(name);
             if (tag) free(tag);
-            if (block_content) free(block_content);
+            if (block_data) free(block_data);
         } end
     } end
 
@@ -106,12 +123,18 @@ context(tests_write_block) {
         } end
 
         it ("Escribe en bloque físico exitosamente") {
-            int retval = write_to_logical_block(12, "file1", "tag1", 3, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = write_to_logical_block(12, "file1", "tag1", 3, content, content_size);
             should_int(retval) be equal to (0);
         } end
 
         it ("No halla el archivo de bloque lógico") {
-            int retval = write_to_logical_block(12, "file1", "tag1", 93, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = write_to_logical_block(12, "file1", "tag1", 93, content, content_size);
             should_int(retval) be equal to (-1);
         } end
     } end
@@ -139,7 +162,10 @@ context(tests_write_block) {
         } end
 
         it ("El file:tag no existe") {
-            int retval = execute_block_write("file1", "tag1", 12, 3, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 3, content, content_size);
 
             should_int(retval) be equal to (FILE_TAG_MISSING);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
@@ -148,7 +174,10 @@ context(tests_write_block) {
         it ("Fallo en la lectura de metadata devuelve código FILE_TAG_MISSING") {
             init_logical_blocks("file1", "tag1", 20, TEST_MOUNT_POINT);
 
-            int retval = execute_block_write("file1", "tag1", 12, 3, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 3, content, content_size);
 
             should_int(retval) be equal to (FILE_TAG_MISSING);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
@@ -158,7 +187,10 @@ context(tests_write_block) {
             init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
             create_test_metadata("file1", "tag1", 3, "[1,2,3]", "COMMITTED", TEST_MOUNT_POINT);
 
-            int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 1, content, content_size);
 
             should_int(retval) be equal to (FILE_ALREADY_COMMITTED);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
@@ -168,7 +200,10 @@ context(tests_write_block) {
             init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
             create_test_metadata("file1", "tag1", 3, "[1,2,3]", "WORK_IN_PROGRESS", TEST_MOUNT_POINT);
 
-            int retval = execute_block_write("file1", "tag1", 12, 7, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 7, content, content_size);
 
             should_int(retval) be equal to (READ_OUT_OF_BOUNDS);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
@@ -178,7 +213,10 @@ context(tests_write_block) {
             init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
             create_test_metadata("file1", "tag1", 3, "[1,2,3]", "WORK_IN_PROGRESS", TEST_MOUNT_POINT);
 
-            int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 1, content, content_size);
 
             should_int(retval) be equal to (-3);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
@@ -191,7 +229,10 @@ context(tests_write_block) {
             size_t numb_blocks = g_storage_config->bitmap_size_bytes * (size_t)8;
             modify_bitmap_bits(TEST_MOUNT_POINT, 0, numb_blocks, 1);
 
-            int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 1, content, content_size);
 
             should_int(retval) be equal to (NOT_ENOUGH_SPACE);
             int lock_res = mutex_is_free(&g_storage_bitmap_mutex);
@@ -204,7 +245,10 @@ context(tests_write_block) {
             create_test_metadata("file1", "tag1", 3, "[1,2,3]", "WORK_IN_PROGRESS", TEST_MOUNT_POINT);
             init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
-            int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
+            int retval = execute_block_write("file1", "tag1", 12, 1, content, content_size);
 
             should_int(retval) be equal to (0);
             int lock_res = mutex_is_free(&g_storage_bitmap_mutex);
@@ -237,11 +281,14 @@ context(tests_write_block) {
 
         it ("El manejador falla y devuelve un paquete de respuesta con código de error") {
             t_package *package = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
             package_add_uint32(package, (uint32_t)12);
             package_add_string(package, "file1");
             package_add_string(package, "tag1");
             package_add_uint32(package, (uint32_t)3);
-            package_add_string(package, "CONTENIDO");
+            package_add_data(package, content, content_size);
             package_reset_read_offset(package);
 
             t_package *response = handle_write_block_request(package);
@@ -262,11 +309,14 @@ context(tests_write_block) {
             init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
             t_package *package = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
+            const char *content = "CONTENIDO";
+            size_t content_size = strlen(content);
+
             package_add_uint32(package, (uint32_t)12);
             package_add_string(package, "file1");
             package_add_string(package, "tag1");
             package_add_uint32(package, (uint32_t)2);
-            package_add_string(package, "CONTENIDO");
+            package_add_data(package, content, content_size);
             package_reset_read_offset(package);
 
             t_package *response = handle_write_block_request(package);
