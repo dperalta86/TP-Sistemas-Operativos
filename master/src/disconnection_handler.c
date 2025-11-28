@@ -71,8 +71,22 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
         return -1;
     }
 
+    // Verificar si ya fue limpiada
+    if (qcb->cleaned_up) {
+        log_debug(master->logger,
+                  "[handle_query_control_disconnection] Query ID=%d ya fue limpiada, ignorando desconexión",
+                  qcb->query_id);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        close(client_socket);
+        return 0;
+    }
+
+    // Guardar datos antes de procesar (por si se libera en otro thread)
+    int query_id = qcb->query_id;
+    t_query_state current_state = qcb->state;
+    
     // Dependiendo del estado de la query, actuar
-    switch (qcb->state) {
+    switch (current_state) {
         case QUERY_STATE_READY:
             cancel_query_in_ready(qcb, master);
             break;
@@ -92,24 +106,31 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
         case QUERY_STATE_COMPLETED:
         case QUERY_STATE_CANCELED:
             log_debug(master->logger, "[handle_query_control_disconnection] Query ID=%d en estado %d, se mueve a CANCELED/EXIT",
-                      qcb->query_id, qcb->state);
+                      query_id, current_state);
             break;
         default:
             finalize_query_with_error(qcb, master, "Query cancelada porque Query Control se desconectó");
             break;
     }
 
-    // Cleanup y cierre de socket del QC
-    cleanup_query_resources(qcb, master);
+    // Verificar nuevamente antes del cleanup (podría haber sido limpiada durante cancel_query_in_exec)
+    if (!qcb->cleaned_up) {
+        // Cleanup y cierre de socket del QC
+        cleanup_query_resources(qcb, master);
+        
+        // Cerrar socket del QC
+        close(client_socket);
+    } else {
+        log_debug(master->logger, 
+                  "[handle_query_control_disconnection] Query ID=%d fue limpiada durante el procesamiento",
+                  query_id);
+        close(client_socket);
+    }
 
     pthread_mutex_unlock(&master->queries_table->query_table_mutex);
 
-    // Cerrar socket del QC (si todavía sigue abierto)
-    close(client_socket);
-
     return 0;
 }
-
 int handle_worker_disconnection(int client_socket, t_master *master) {
     if (master == NULL || master->workers_table == NULL) {
         if (master && master->logger) log_error(master->logger, "[handle_worker_disconnection] master o workers_table NULL");
@@ -163,11 +184,10 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
     // Remover worker de las listas y liberar recursos
     cleanup_worker_resources(wcb, master);
 
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
     // Cerrar socket
     close(client_socket);
 
+    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
 }
 
@@ -367,6 +387,17 @@ void finalize_query_with_error(t_query_control_block *qcb, t_master *master, con
  */
 void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return;
+
+    // Verificar si ya fue limpiada (para evitar doble free)
+    if (qcb->cleaned_up) {
+        log_debug(master->logger, 
+                  "[cleanup_query_resources] Query ID=%d ya fue limpiada anteriormente",
+                  qcb->query_id);
+        return;
+    }
+
+    // Marco como "limpiada" ANTES de hacer cleanup
+    qcb->cleaned_up = true;
 
     log_debug(master->logger, "[cleanup_query_resources] Limpiando recursos para Query ID=%d", qcb->query_id);
 

@@ -96,6 +96,7 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
     qcb->program_counter = 0; // Inicia en 0, luego lo actualiza con datos desde el Worker
     qcb->state = QUERY_STATE_READY; // Inicia en READY al ser creada
     qcb->preemption_pending = false; // No hay desalojo pendiente al inicio
+    qcb->cleaned_up = false; // No se han liberado recursos aún
     qcb->ready_timestamp = now_ms_monotonic();
 
     // Agregamos a la lista principal y a la cola de ready (teniendo en cuenta planificador)

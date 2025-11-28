@@ -35,6 +35,7 @@ typedef struct {
     int assigned_worker_id;
     int program_counter;
     bool preemption_pending; // Indica si está en proceso de ser desalojada
+    bool cleaned_up;; // Indica si se han liberado los recursos asociados
     t_query_state state;
 } t_query_control_block;
 
