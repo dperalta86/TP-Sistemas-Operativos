@@ -80,7 +80,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     free(file);
     free(tag);
 
-    log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. File:Tag <%s> Data= %s", worker_id, query_id, file_tag, data);
+    log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. File:Tag <%s> Data= %s", worker_id, query_id, file_tag, (char*)data);
 
     // Buscar la query correspondiente al ID
     t_query_control_block *query = NULL;
