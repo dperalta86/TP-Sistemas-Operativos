@@ -249,7 +249,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     uint32_t block_number = page_number;
     void *data = NULL;
     size_t size = 0;
-    int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->worker_id);
+    int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->query_id);
 
     if (result == 0 && data != NULL && size > 0)
     {
@@ -574,7 +574,7 @@ int mm_flush_query(memory_manager_t *mm, char *file, char *tag)
         int write_res = write_block_to_storage(mm->storage_socket,
                                                file, tag, p->page_number,
                                                frame_addr, mm->page_size,
-                                               mm->worker_id);
+                                               mm->query_id);
         if (write_res != 0)
         {
             if (logger)
@@ -667,7 +667,7 @@ int mm_flush_all_dirty(memory_manager_t *mm)
             int write_res = write_block_to_storage(mm->storage_socket,
                                                    file, tag, p->page_number,
                                                    frame_addr, mm->page_size,
-                                                   mm->worker_id);
+                                                   mm->query_id);
             if (write_res != 0)
             {
                 if (logger)
@@ -821,7 +821,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
             victim_page,
             frame_addr,
             mm->page_size,
-            mm->worker_id);
+            mm->query_id);
 
         if (write_result != 0)
         {
@@ -987,7 +987,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
                 dirty_page_idx,
                 frame_addr,
                 mm->page_size,
-                mm->worker_id);
+                mm->query_id);
 
             if (write_result != 0)
             {
