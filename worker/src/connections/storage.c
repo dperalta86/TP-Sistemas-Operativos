@@ -37,7 +37,7 @@ static int send_request_and_wait_ack_with_error_handling(int storage_socket,
     // Verificar si Storage reportó un error
     if (response->operation_code == STORAGE_OP_ERROR)
     {
-        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Storage reportó un error para la operación: %s", operation_name);
+        log_debug(logger, "[send_request_and_wait_ack_with_error_handling] Storage reportó un error para la operación: %s", operation_name);
         handler_error_from_storage(response, master_socket, worker_id);
         package_destroy(response);
         return -1;
@@ -475,8 +475,6 @@ int write_block_to_storage(int storage_socket, int master_socket, char *file, ch
 
 int delete_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, int worker_id)
 {
-    // Nota: Esta función no tiene acceso a master_socket, por lo que no puede notificar errores
-    // Los errores serán capturados en query_interpreter.c y manejados allí
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_DELETE_REQ);
 
