@@ -35,8 +35,6 @@ void *handle_client(void *arg) {
       goto cleanup;
     }
 
-    usleep(g_storage_config->operation_delay * 1000);
-
     t_package *response;
     switch (request->operation_code) {
     case STORAGE_OP_WORKER_SEND_ID_REQ:

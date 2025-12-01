@@ -72,26 +72,7 @@ t_package *handle_read_block_request(t_package *package) {
     }
   }
 
-/*   if (!package_add_int8(response, (int8_t)operation_result)) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32 " - Error al escribir status en respuesta de READ BLOCK", query_id);
-    package_destroy(response);
-    free(read_buffer);
-    return NULL;
-  }
-
-  if (operation_result == 0) {
-        if (!package_add_string(response, read_buffer)) { 
-            log_error(g_storage_logger,
-                      "## Query ID: %" PRIu32 " - Error al escribir contenido del bloque en respuesta.", query_id);
-            package_destroy(response);
-            free(read_buffer);
-            return NULL;
-        }
-  }   */
-
   free(read_buffer);
-
   package_reset_read_offset(response);
 
   return response;
