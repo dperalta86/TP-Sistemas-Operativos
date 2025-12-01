@@ -15,7 +15,7 @@ int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
   snprintf(dst_path, PATH_MAX, "%s/files/%s/%s/logical_blocks", g_storage_config->mount_point,
            file_dst, tag_dst);
 
-  lock_file(file_dst, tag_dst, true);
+  //lock_file(file_dst, tag_dst, true);
 
   t_file_metadata *metadata_dst =
       read_file_metadata(g_storage_config->mount_point, file_dst, tag_dst);
@@ -27,7 +27,7 @@ int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
     goto end;
   }
 
-  lock_file(file_src, tag_src, false);
+  //lock_file(file_src, tag_src, false);
 
   t_file_metadata *metadata_src =
       read_file_metadata(g_storage_config->mount_point, file_src, tag_src);
@@ -97,12 +97,12 @@ int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
            file_dst, tag_dst);
 
 cleanup_source_lock:
-  unlock_file(file_src, tag_src);
+  //unlock_file(file_src, tag_src);
   if (metadata_src)
     destroy_file_metadata(metadata_src);
 
 end:
-  unlock_file(file_dst, tag_dst);
+  //unlock_file(file_dst, tag_dst);
   if (metadata_dst) 
     destroy_file_metadata(metadata_dst);
   return retval;
