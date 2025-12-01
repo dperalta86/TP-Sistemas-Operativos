@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        log_info(logger, "Cliente conectado en socket %d", client_socket_fd);
+        log_debug(logger, "Cliente conectado en socket %d", client_socket_fd);
 
         t_client_data *client_data = malloc(sizeof(t_client_data));
         if (client_data == NULL) {
@@ -176,7 +176,7 @@ void* handle_client(void* arg) {
                 log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
                 if (manage_query_handshake(client_socket, master->logger) == 0) {
                     is_query_control = true;
-                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
+                    log_debug(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
                 }       
                 break;
             case OP_QUERY_FILE_PATH:
@@ -195,7 +195,7 @@ void* handle_client(void* arg) {
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
                     is_worker = true;
-                    log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
+                    log_debug(master->logger, "Handshake completado con worker en socket %d", client_socket);
                 }              
                 break;
             case OP_WORKER_READ_MESSAGE_REQ:

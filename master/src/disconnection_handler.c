@@ -45,7 +45,7 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
         return -1;
     }
 
-    log_info(master->logger, "[handle_query_control_disconnection] Query Control disconnected on socket %d", client_socket);
+    log_debug(master->logger, "[handle_query_control_disconnection] Query Control disconnected on socket %d", client_socket);
 
     if (pthread_mutex_lock(&master->queries_table->query_table_mutex) != 0) {
         log_error(master->logger, "[handle_query_control_disconnection] Error locking query_table_mutex");
@@ -55,7 +55,7 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
     t_query_control_block *qcb = find_query_by_socket(master->queries_table, client_socket);
 
     if (!qcb) {
-        log_warning(master->logger, "[handle_query_control_disconnection] No se encontró QC en socket %d", client_socket);
+        log_debug(master->logger, "[handle_query_control_disconnection] No se encontró QC en socket %d", client_socket);
         pthread_mutex_unlock(&master->queries_table->query_table_mutex);
         close(client_socket);
         return -1;
@@ -118,7 +118,7 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
         return -1;
     }
 
-    log_info(master->logger, "[handle_worker_disconnection] Worker disconnected on socket %d", client_socket);
+    log_debug(master->logger, "[handle_worker_disconnection] Worker disconnected on socket %d", client_socket);
     
     // Bloquear tabla de workers para acceso seguro, manteniendo convención de locking
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
@@ -148,8 +148,8 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
             t_query_control_block *qcb = list_find(master->queries_table->query_list, match_query_by_id);
 
             if (qcb) {
-                log_warning(master->logger, "[handle_worker_disconnection] Worker socket %d desconectado mientras realizaba la Query ID=%d (QC socket=%d)",
-                            client_socket, qcb->query_id, qcb->socket_fd);
+                log_warning(master->logger, "[handle_worker_disconnection] Worker id %d desconectado mientras realizaba la Query ID=%d (QC socket=%d)",
+                            wcb->worker_id, qcb->query_id, qcb->socket_fd);
 
                 finalize_query_with_error(qcb, master, "Se desconectó worker mientras realizaba la query");
                 // mover qcb a canceled/completed/exit según manejo interno

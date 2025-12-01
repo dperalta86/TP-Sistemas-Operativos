@@ -160,6 +160,7 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         log_error(state->logger, "## Query %d: Error al decodificar - %s", 
                   ctx->query_id, raw_instruction);
         free(raw_instruction);
+        free(instruction);
         return QUERY_RESULT_ERROR;
     }
 

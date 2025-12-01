@@ -83,7 +83,7 @@ int try_dispatch(t_master *master) {
     list_add(master->queries_table->running_list, query);
     list_add(master->workers_table->busy_list, worker);
 
-    log_info(master->logger,
+    log_debug(master->logger,
         "[try_dispatch] Asignada Query ID=%d al Worker ID=%d",
         query->query_id, worker->worker_id);
 
@@ -188,8 +188,8 @@ int send_query_to_worker(t_master *master, t_worker_control_block *worker, t_que
     }
 
     // Log de éxito
-    log_info(master->logger, "[send_query_to_worker] Query ID=%d enviada al Worker ID=%d (socket=%d).",
-             query->query_id, worker->worker_id, worker->socket_fd);
+    log_info(master->logger, "## Se envía la Query id: %d (prioridad: %d) al Worker id: %d",
+             query->query_id, query->priority, worker->worker_id);
 
     // Liberar memoria
     package_destroy(package_send_query);
