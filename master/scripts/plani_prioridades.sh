@@ -1,2 +1,2 @@
 #!/bin/bash
-./scripts/apply_config.sh "./src/config/master.config" "PRIORITY" 5000
+./scripts/apply_config.sh "./src/config/master.config" "PRIORITY" 500
