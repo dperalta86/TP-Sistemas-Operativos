@@ -214,7 +214,6 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
     if (instruction == NULL || memory_manager == NULL) {
         return -1;
     }
-
     switch(instruction->operation) {
         case CREATE: {
             int result = create_file_in_storage(socket_storage, socket_master, query_id, instruction->file_tag.file, instruction->file_tag.tag);
@@ -282,7 +281,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (flush_result != 0) {
                 return -1;
             }
-            int result = commit_file_in_storage(socket_storage, socket_master, instruction->file_tag.file, instruction->file_tag.tag, worker_id);
+            int result = commit_file_in_storage(socket_storage, socket_master, instruction->file_tag.file, instruction->file_tag.tag, query_id);
             if (result != 0) {
                 return -1;
             }

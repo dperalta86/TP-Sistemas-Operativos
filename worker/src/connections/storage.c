@@ -151,7 +151,7 @@ int get_block_size(int storage_socket, uint16_t *block_size, int worker_id)
     return 0;
 }
 
-int read_block_from_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int worker_id)
+int read_block_from_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int query_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_BLOCK_READ_REQ);
@@ -162,7 +162,7 @@ int read_block_from_storage(int storage_socket, int master_socket, char *file, c
         return -1;
     }
 
-    if (!package_add_uint32(request, worker_id) ||
+    if (!package_add_uint32(request, query_id) ||
         !package_add_string(request, file) ||
         !package_add_string(request, tag) ||
         !package_add_uint32(request, block_number))
@@ -190,7 +190,7 @@ int read_block_from_storage(int storage_socket, int master_socket, char *file, c
         log_debug(logger, "Recibo ACK por parte de storage para la operación lectura de bloque");
     } else if (storage_response->operation_code == STORAGE_OP_ERROR) {
         log_error(logger, "Storage reportó error: lectura de bloque");
-        handler_error_from_storage(storage_response, master_socket, worker_id);
+        handler_error_from_storage(storage_response, master_socket, query_id);
         return -1;
     } else {
         log_error(logger, "Tipo de paquete inesperado para la respuesta de creación de archivo...");
@@ -256,13 +256,13 @@ int create_file_in_storage(int storage_socket, int master_socket, int worker_id,
     return -1;
 }
 
-int truncate_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, size_t size, int worker_id)
+int truncate_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, size_t size, int query_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_FILE_TRUNCATE_REQ);
 
     if (request &&
-        package_add_uint32(request, worker_id) &&
+        package_add_uint32(request, query_id) &&
         package_add_string(request, file) &&
         package_add_string(request, tag) &&
         package_add_uint32(request, (uint32_t)size))
@@ -273,7 +273,7 @@ int truncate_file_in_storage(int storage_socket, int master_socket, char *file, 
                                                          request,
                                                          STORAGE_OP_FILE_TRUNCATE_RES,
                                                          "truncate archivo", 
-                                                         worker_id);
+                                                         query_id);
     }
     
     log_error(logger, "Error al preparar el paquete para truncar archivo");
@@ -282,13 +282,13 @@ int truncate_file_in_storage(int storage_socket, int master_socket, char *file, 
     return -1;
 }
 
-int fork_file_in_storage(int storage_socket, int master_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id)
+int fork_file_in_storage(int storage_socket, int master_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int query_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_CREATE_REQ);
 
     if (request &&
-        package_add_uint32(request, worker_id) &&
+        package_add_uint32(request, query_id) &&
         package_add_string(request, file_src) &&
         package_add_string(request, tag_src) &&
         package_add_string(request, file_dst) &&
@@ -300,7 +300,7 @@ int fork_file_in_storage(int storage_socket, int master_socket, char *file_src, 
                                                         request,
                                                         STORAGE_OP_TAG_CREATE_RES,
                                                         "fork (TAG) de archivo", 
-                                                        worker_id);
+                                                        query_id);
     }
 
     log_error(logger, "Error al preparar el paquete para fork");

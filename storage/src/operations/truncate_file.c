@@ -96,7 +96,7 @@ update_size:
   }
 
   log_info(g_storage_logger,
-           "## %u - File Truncado: %s:%s - Nuevo Tamaño: %d bytes", query_id,
+           "## Query ID: %u - File Truncado: %s:%s - Nuevo Tamaño: %d bytes", query_id,
            name, tag, new_size_bytes);
 
 clean_metadata:

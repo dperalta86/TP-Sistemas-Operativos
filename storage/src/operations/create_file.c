@@ -25,7 +25,7 @@ int _create_file(uint32_t query_id, const char *name, const char *tag,
     return -2;
   }
 
-  log_info(g_storage_logger, "## %u - File Creado: %s:%s", query_id, name, tag);
+  log_info(g_storage_logger, "## Query ID: %u - File Creado: %s:%s", query_id, name, tag);
 
   return 0;
 }

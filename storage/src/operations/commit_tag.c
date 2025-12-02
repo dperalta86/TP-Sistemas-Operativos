@@ -6,7 +6,6 @@ t_package *handle_tag_commit_request(t_package *package) {
   t_package *response = NULL;
   char *name = NULL;
   char *tag = NULL;
-
   if (deserialize_tag_commit_request(package, &query_id, &name, &tag) < 0) {
     return NULL;
   }
