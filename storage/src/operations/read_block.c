@@ -127,7 +127,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
                         uint32_t block_number, void *read_buffer) {
   int retval = 0;
 
-  lock_file(name, tag, false);
+  //lock_file(name, tag, false);
   log_debug(g_storage_logger, "/**** Query ID %" PRIu32 ": Lock de lectura adquirido.", query_id);
 
   if (!file_dir_exists(name, tag)) {
@@ -169,7 +169,7 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
   log_debug(g_storage_logger, "/**** Query ID %" PRIu32 ": Lock de lectura liberado.", query_id);
   usleep(g_storage_config->block_access_delay/2 * 1000);
 

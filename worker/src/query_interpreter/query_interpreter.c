@@ -273,9 +273,13 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             free(buffer);
             break;
         }
-        case TAG:
-            fork_file_in_storage(socket_storage, socket_master, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst, query_id);
+        case TAG: {
+            int result = fork_file_in_storage(socket_storage, socket_master, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst, query_id);
+            if (result != 0) {
+                return -1;
+            }
             break;
+        }
         case COMMIT: {
             int flush_result = mm_flush_query(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
             if (flush_result != 0) {

@@ -473,7 +473,7 @@ int mm_allocate_frame(memory_manager_t *mm)
     {
         log_info(logger, "## Query %d: - Memoria Llena - No hay marcos disponibles (Frame Count: %d)",
                  mm->query_id, mm->frame_table.frame_count);
-        log_info(logger, "## Query %d: Política de reemplazo configurada: %s (%d)",
+        log_debug(logger, "## Query %d: Política de reemplazo configurada: %s (%d)",
                  mm->query_id, mm->policy == LRU ? "LRU" : (mm->policy == CLOCK_M ? "CLOCK-M" : "DESCONOCIDA"), mm->policy);
     }
 
@@ -484,7 +484,7 @@ int mm_allocate_frame(memory_manager_t *mm)
         {
             if (logger)
             {
-                log_info(logger, "## Query %d: Frame %d liberado usando algoritmo LRU",
+                log_debug(logger, "## Query %d: Frame %d liberado usando algoritmo LRU",
                          mm->query_id, victim_frame);
             }
             mm->frame_table.frames[victim_frame].used = true;
@@ -498,7 +498,7 @@ int mm_allocate_frame(memory_manager_t *mm)
         {
             if (logger)
             {
-                log_info(logger,
+                log_debug(logger,
                          "## Query %d: Frame %d liberado usando algoritmo CLOCK-M",
                          mm->query_id,
                          victim_frame);
@@ -831,7 +831,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
     {
         if (logger)
         {
-            log_info(logger,
+            log_debug(logger,
                      "## Query %d: Página sucia siendo reemplazada - File: %s - Tag: %s - Pagina: %d",
                      mm->query_id, victim_file, victim_tag, victim_page);
         }
