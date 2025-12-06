@@ -2,7 +2,10 @@
 #include "worker_manager.h"
 #include "init_master.h"
 #include "aging.h"
+#include "scheduler.h"
+#include "disconnection_handler.h"
 #include <unistd.h>
+#include <commons/log.h>
 
 static int search_worker_id = -1;
 
@@ -12,7 +15,13 @@ void *aging_thread_func(void *arg) {
     while (master->running) {
         // Definir cada cuanto se hace la verificación, un tiempo fijo (100ms, 250ms)
         // o una fracción del aging interval (10 veces cada intervalo)
-        usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
+        if (master->aging_interval <= 0) {
+            usleep(100000); // 100ms
+            continue;
+        }else{
+            usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
+        }
+        //try_dispatch(master); // Intentar despachar queries pendientes (por errores)
 
         uint64_t now = now_ms_monotonic();
 
@@ -22,7 +31,7 @@ void *aging_thread_func(void *arg) {
         }
 
         // si ready queue está vacia, nada para hacer
-        if (list_is_empty(master->queries_table->ready_queue)) {
+        if (list_is_empty(master->queries_table->ready_queue)) {            
             pthread_mutex_unlock(&master->queries_table->query_table_mutex);
             continue;
         }
@@ -67,10 +76,8 @@ void *aging_thread_func(void *arg) {
 
                 // Actualizamos en timestamp en Ready
                 qcb->ready_timestamp += (uint64_t)intervals * (uint64_t)master->aging_interval;
-
-                log_info(master->logger,
-                         "##<QUERY_ID: %d> Cambio de prioridad: <PRIORIDAD_ANTERIOR: %d> - <PRIORIDAD_NUEVA: %d>",
-                         qcb->query_id, original_priority, qcb->priority);
+                
+                log_info(master->logger, "##<QUERY_ID: %d> Cambio de prioridad: <PRIORIDAD_ANTERIOR: %d> - <PRIORIDAD_NUEVA: %d>", qcb->query_id, original_priority, qcb->priority);
             }
         }
 
@@ -129,6 +136,13 @@ unlock_and_exit:
 int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return -1;
 
+    if (qcb->preemption_pending) {
+        log_debug(master->logger,
+            "[preempt_query_in_exec] Query ID=%d ya tiene desalojo pendiente",
+            qcb->query_id);
+        return 0;
+    }
+
     search_worker_id = qcb->assigned_worker_id;
     t_worker_control_block *worker = list_find(
         master->workers_table->worker_list,
@@ -136,24 +150,31 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     );
 
     if (!worker || worker->socket_fd <= 0) {
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
         log_error(master->logger,
             "[preempt_query_in_exec] Worker inválido durante preemption. Finalizando Query ID=%d",
             qcb->query_id
         );
 
-        // Estas dos funciones están en la PR que maneja desconexiones
-        // Quedan comentadas hasta que se apruebe
-        // finalize_query_with_error(qcb, master, "Error en preemption");
-        // cleanup_query_resources(qcb, master);
+        finalize_query_with_error(qcb, master, "Error en preemption - worker inválido");
+        cleanup_query_resources(qcb, master);
         return -1;
     }
 
-    // Envío solicitud de desalojo, la respuesta la manejo en el worker_manager
+    qcb->preemption_pending = true;
+
+    // Envío solicitud de desalojo
     t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
     package_add_uint32(pkg, (uint32_t)qcb->query_id);
-    package_send(pkg, worker->socket_fd);
+    
+    if (package_send(pkg, worker->socket_fd) != 0) {
+        log_error(master->logger,
+            "[preempt_query_in_exec] Error al enviar solicitud de desalojo al Worker ID=%d",
+            worker->worker_id);
+        qcb->preemption_pending = false; 
+        package_destroy(pkg);
+        return -1;
+    }
+    
     package_destroy(pkg);
 
     log_info(master->logger,
@@ -161,7 +182,6 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
         qcb->query_id, qcb->priority, worker->worker_id
     );
 
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
 }
 

@@ -82,21 +82,87 @@ error:
 }
 
 void destroy_master(t_master *master) {
-    // TODO: Verificar si es necesario liberar las listas dentro de las tablas
-    if (master != NULL) {
-        int priority_algorithm = strcmp(master->scheduling_algorithm, "PRIORITY");
-        if (master->ip != NULL) free(master->ip);
-        if (master->scheduling_algorithm != NULL) free(master->scheduling_algorithm);
-        if (master->workers_table != NULL) {
-            free(master->workers_table);
+    if (!master) return;
+    
+    // Guardar antes de liberar el string
+    bool is_priority = master->scheduling_algorithm && 
+                       (strcmp(master->scheduling_algorithm, "PRIORITY") == 0);
+    
+    if (master->queries_table) {
+        if (master->queries_table->query_list) {
+            while (!list_is_empty(master->queries_table->query_list)) {
+                t_query_control_block *qcb = list_remove(master->queries_table->query_list, 0);
+                if (qcb) {
+                    if (qcb->query_file_path) {
+                        free(qcb->query_file_path);
+                    }
+                    free(qcb);
+                }
+            }
+            list_destroy(master->queries_table->query_list);
         }
-        if (master->queries_table != NULL) {
-            free(master->queries_table);
+        
+        // Destruir cada lista solo si existe
+        if (master->queries_table->ready_queue) {
+            list_destroy(master->queries_table->ready_queue);
         }
-        if(priority_algorithm == 0) {
-            pthread_join(master->aging_thread, NULL);
+        if (master->queries_table->running_list) {
+            list_destroy(master->queries_table->running_list);
+        }
+        if (master->queries_table->completed_list) {
+            list_destroy(master->queries_table->completed_list);
+        }
+        if (master->queries_table->canceled_list) {
+            list_destroy(master->queries_table->canceled_list);
+        }
+        
+        pthread_mutex_destroy(&master->queries_table->query_table_mutex);
+        free(master->queries_table);
+    }
+    
+    if (master->workers_table) {
+        if (master->workers_table->worker_list) {
+            while (!list_is_empty(master->workers_table->worker_list)) {
+                t_worker_control_block *wcb = list_remove(master->workers_table->worker_list, 0);
+                if (wcb) {
+                    if (wcb->ip_address) {
+                        free(wcb->ip_address);
+                    }
+                    free(wcb);
+                }
+            }
+            list_destroy(master->workers_table->worker_list);
+        }
+        
+        // Destruir cada lista (solo si existe)
+        if (master->workers_table->idle_list) {
+            list_destroy(master->workers_table->idle_list);
+        }
+        if (master->workers_table->busy_list) {
+            list_destroy(master->workers_table->busy_list);
+        }
+        if (master->workers_table->disconnected_list) {
+            list_destroy(master->workers_table->disconnected_list);
+        }
+        
+        pthread_mutex_destroy(&master->workers_table->worker_table_mutex);
+        free(master->workers_table);
+    }
+    
+    // Liberar los demás campos
+    if (master->ip) free(master->ip);
+    if (master->port) free(master->port);
+    if (master->scheduling_algorithm) free(master->scheduling_algorithm);
+    
+    // join de thread (si estamos en priority)
+    if (is_priority) {
+        pthread_join(master->aging_thread, NULL);
+        if (master->logger) {
             log_info(master->logger, "Aging thread finalizado correctamente.");
         }
-        free(master);
     }
+    
+    if (master->logger) log_destroy(master->logger);
+    
+    free(master);
 }

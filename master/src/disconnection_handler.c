@@ -1,4 +1,6 @@
 #include "disconnection_handler.h"
+#include "scheduler.h"
+#include "aging.h"
 
 #include <commons/collections/list.h>
 #include <stdlib.h>
@@ -11,26 +13,19 @@
 #include "worker_manager.h"
 #include "connection/serialization.h"
 
-// --- Query por ID ---
+// Variables estáticas para predicados de búsqueda
 static int running_query_id_for_predicate = -1;
+static int search_worker_id = -1;
+static int search_query_socket_fd = -1;
+static int search_worker_socket_fd = -1;
 
+// --- Query por ID ---
 static bool match_query_by_id(void *elem) {
     t_query_control_block *query = (t_query_control_block*)elem;
     return query && (query->query_id == running_query_id_for_predicate);
 }
 
-// --- Worker por ID ---
-static int search_worker_id = -1;
-
-static bool match_worker_by_id(void *element) {
-    t_worker_control_block *worker = (t_worker_control_block *) element;
-    if (worker == NULL) return false;
-    return (worker->worker_id == search_worker_id);
-}
-
 // --- Query por socket_fd ---
-static int search_query_socket_fd = -1;
-
 static bool match_query_by_socket(void *element) {
     t_query_control_block *query = (t_query_control_block *)element;
     if (!query) return false;
@@ -38,14 +33,11 @@ static bool match_query_by_socket(void *element) {
 }
 
 // --- Worker por socket_fd ---
-static int search_worker_socket_fd = -1;
-
 static bool match_worker_by_socket(void *element) {
     t_worker_control_block *worker = (t_worker_control_block *)element;
     if (!worker) return false;
     return (worker->socket_fd == search_worker_socket_fd);
 }
-
 
 int handle_query_control_disconnection(int client_socket, t_master *master) {
     if (master == NULL || master->queries_table == NULL) {
@@ -53,10 +45,8 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
         return -1;
     }
 
-    log_info(master->logger, "[handle_query_control_disconnection] Query Control disconnected on socket %d", client_socket);
+    log_debug(master->logger, "[handle_query_control_disconnection] Query Control disconnected on socket %d", client_socket);
 
-    // Buscar QCB asociado al socket del QC
-    // Bloqueamos la tabla de queries para acceder segura
     if (pthread_mutex_lock(&master->queries_table->query_table_mutex) != 0) {
         log_error(master->logger, "[handle_query_control_disconnection] Error locking query_table_mutex");
         return -1;
@@ -65,45 +55,58 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
     t_query_control_block *qcb = find_query_by_socket(master->queries_table, client_socket);
 
     if (!qcb) {
-        log_warning(master->logger, "[handle_query_control_disconnection] No se encontró QC en socket %d", client_socket);
+        log_debug(master->logger, "[handle_query_control_disconnection] No se encontró QC en socket %d", client_socket);
         pthread_mutex_unlock(&master->queries_table->query_table_mutex);
         close(client_socket);
         return -1;
     }
 
-    // Dependiendo del estado de la query, actuar
-    switch (qcb->state) {
+    if (qcb->cleaned_up) {
+        log_debug(master->logger,
+                  "[handle_query_control_disconnection] Query ID=%d ya fue limpiada, ignorando desconexión",
+                  qcb->query_id);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        close(client_socket);
+        return 0;
+    }
+
+    int query_id = qcb->query_id;
+    t_query_state current_state = qcb->state;
+    
+    switch (current_state) {
         case QUERY_STATE_READY:
             cancel_query_in_ready(qcb, master);
+            cleanup_query_resources(qcb, master);
             break;
+            
         case QUERY_STATE_RUNNING:
-            // Para notificar al worker, necesitamos el worker_table mutex
-            // Siguiendo la convención: lock workers después queries para evitar posibles deadlocks.
             if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
                 log_error(master->logger, "[handle_query_control_disconnection] Error locking worker_table_mutex");
-                // Se intenta cancelar sin lock (podría fallar si otro thread está modificando), pero hay que terminar la query...
-                cancel_query_in_exec(qcb, master);
             } else {
-                cancel_query_in_exec(qcb, master);
+                // Marcar como cancelada ANTES de preempt
+                qcb->state = QUERY_STATE_CANCELED;
+                
+                // preempt_query_in_exec ya setea preemption_pending
+                preempt_query_in_exec(qcb, master);
+                
                 pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
             }
             break;
-        case QUERY_STATE_NEW:
+            
         case QUERY_STATE_COMPLETED:
         case QUERY_STATE_CANCELED:
+            log_debug(master->logger, "[handle_query_control_disconnection] Query ID=%d en estado %d",
+                      query_id, current_state);
+            cleanup_query_resources(qcb, master);
+            break;
+            
         default:
-            log_debug(master->logger, "[handle_query_control_disconnection] Query ID=%d en estado %d, se mueve a CANCELED/EXIT",
-                      qcb->query_id, qcb->state);
             finalize_query_with_error(qcb, master, "Query cancelada porque Query Control se desconectó");
+            cleanup_query_resources(qcb, master);
             break;
     }
 
-    // Cleanup y cierre de socket del QC
-    cleanup_query_resources(qcb, master);
-
     pthread_mutex_unlock(&master->queries_table->query_table_mutex);
-
-    // Cerrar socket del QC (si todavía sigue abierto)
     close(client_socket);
 
     return 0;
@@ -115,7 +118,7 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
         return -1;
     }
 
-    log_info(master->logger, "[handle_worker_disconnection] Worker disconnected on socket %d", client_socket);
+    log_debug(master->logger, "[handle_worker_disconnection] Worker disconnected on socket %d", client_socket);
     
     // Bloquear tabla de workers para acceso seguro, manteniendo convención de locking
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
@@ -145,8 +148,8 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
             t_query_control_block *qcb = list_find(master->queries_table->query_list, match_query_by_id);
 
             if (qcb) {
-                log_warning(master->logger, "[handle_worker_disconnection] Worker socket %d desconectado mientras realizaba la Query ID=%d (QC socket=%d)",
-                            client_socket, qcb->query_id, qcb->socket_fd);
+                log_warning(master->logger, "[handle_worker_disconnection] Worker id %d desconectado mientras realizaba la Query ID=%d (QC socket=%d)",
+                            wcb->worker_id, qcb->query_id, qcb->socket_fd);
 
                 finalize_query_with_error(qcb, master, "Se desconectó worker mientras realizaba la query");
                 // mover qcb a canceled/completed/exit según manejo interno
@@ -162,11 +165,10 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
     // Remover worker de las listas y liberar recursos
     cleanup_worker_resources(wcb, master);
 
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
     // Cerrar socket
     close(client_socket);
 
+    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
 }
 
@@ -180,85 +182,6 @@ void cancel_query_in_ready(t_query_control_block *qcb, t_master *master) {
 
     finalize_query_with_error(qcb, master, "Se cancela Query - QC desconectada (READY)");
 }
-
-int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
-    if (!qcb || !master) return -1;
-
-    log_debug(master->logger, "[cancel_query_in_exec] Cancelando Query ID=%d en estado EXEC (QC socket=%d, asignada a worker id=%d)",
-             qcb->query_id, qcb->socket_fd, qcb->assigned_worker_id);
-
-    // Buscar worker por assigned_worker_id en workers_table
-    if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Error al bloquear worker_table_mutex (continuando best-effort)");
-        // continue best-effort
-    }
-
-    // Encontrar worker by id
-    t_worker_control_block *target_worker = NULL;
-    if (master->workers_table && master->workers_table->worker_list) {
-        search_worker_id = qcb->assigned_worker_id;
-        target_worker = list_find(master->workers_table->worker_list, match_worker_by_id);
-    }
-
-    if (!target_worker) {
-        log_error(master->logger, "[cancel_query_in_exec] No se encontró el worker asignado con id=%d", qcb->assigned_worker_id);
-        if (pthread_mutex_unlock(&master->workers_table->worker_table_mutex) != 0) {
-            log_error(master->logger, "[cancel_query_in_exec] Error al desbloquear worker_table_mutex");
-        }
-        // finalizar query con error ya que worker no está disponible
-        finalize_query_with_error(qcb, master, "Worker asignado no disponible para desalojar query");
-        return -1;
-    }
-
-    // Si el worker no tiene socket válido -> finalizar con error
-    if (target_worker->socket_fd <= 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Worker ID=%d tiene socket inválido (%d)", target_worker->worker_id, target_worker->socket_fd);
-        finalize_query_with_error(qcb, master, "Socket del worker inválido durante cancelación");
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        return -1;
-    }
-
-    // Enviar petición de eviction al worker
-    t_package *pkg = package_create_empty(OP_WORKER_EVICT_REQ);
-    if (!pkg) {
-        log_error(master->logger, "[cancel_query_in_exec] No se pudo crear paquete de desalojo");
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Error interno: no se pudo crear paquete de desalojo");
-        return -1;
-    }
-
-    // Agregamos query_id para que el worker sepa qué desalojar
-    if (!package_add_uint32(pkg, (uint32_t)qcb->query_id)) {
-        log_error(master->logger, "[cancel_query_in_exec] Error al agregar query_id al paquete de desalojo");
-        package_destroy(pkg);
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Error interno: no se pudo serializar paquete de desalojo");
-        return -1;
-    }
-
-    if (package_send(pkg, target_worker->socket_fd) != 0) {
-        log_error(master->logger, "[cancel_query_in_exec] Error al enviar solicitud de desalojo al Worker ID=%d (socket=%d)",
-                  target_worker->worker_id, target_worker->socket_fd);
-        package_destroy(pkg);
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-        finalize_query_with_error(qcb, master, "Falló el envío de solicitud de desalojo al worker");
-        return -1;
-    }
-
-    log_info(master->logger, "[cancel_query_in_exec] Solicitud de desalojo enviada al Worker ID=%d para Query ID=%d",
-             target_worker->worker_id, qcb->query_id);
-
-    // Marcar la query como CANCELED
-    qcb->state = QUERY_STATE_CANCELED;
-
-    package_destroy(pkg);
-
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
-    // La respuesta del worker deberá ser manejada por handle_eviction_response cuando llegue
-    return 0;
-}
-
 
 /**
  * handle_eviction_response:
@@ -367,35 +290,34 @@ void finalize_query_with_error(t_query_control_block *qcb, t_master *master, con
 void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return;
 
+    // Verificar si ya fue limpiada (para evitar doble free)
+    if (qcb->cleaned_up) {
+        log_debug(master->logger, 
+                  "[cleanup_query_resources] Query ID=%d ya fue limpiada anteriormente",
+                  qcb->query_id);
+        return;
+    }
+
+    // Marco como "limpiada" ANTES de hacer cleanup
+    qcb->cleaned_up = true;
+
     log_debug(master->logger, "[cleanup_query_resources] Limpiando recursos para Query ID=%d", qcb->query_id);
 
-    // Remover de listas si están presentes (best-effort)
-    if (master->queries_table && master->queries_table->ready_queue) {
-        if (list_remove_element(master->queries_table->ready_queue, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de ready_queue", qcb->query_id);
-        }
-    }
-    if (master->queries_table && master->queries_table->running_list) {
-        if (list_remove_element(master->queries_table->running_list, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de running_list", qcb->query_id);
-        }
-    }
-    if (master->queries_table && master->queries_table->completed_list) {
-        if (list_remove_element(master->queries_table->completed_list, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de completed_list", qcb->query_id);
-        }
-    }
-    if (master->queries_table && master->queries_table->canceled_list) {
-        if (!list_find(master->queries_table->canceled_list, (void*) qcb)) {
-            list_add(master->queries_table->canceled_list, qcb);
-        }
+    // Remover de TODAS las listas (best-effort)
+    if (master->queries_table) {
+        list_remove_element(master->queries_table->ready_queue, qcb);
+        list_remove_element(master->queries_table->running_list, qcb);
+        list_remove_element(master->queries_table->completed_list, qcb);
+        list_remove_element(master->queries_table->canceled_list, qcb);
+        list_remove_element(master->queries_table->query_list, qcb);
     }
 
-    // Liberar campos dinámicos
     if (qcb->query_file_path) {
         free(qcb->query_file_path);
         qcb->query_file_path = NULL;
     }
+    
+    free(qcb);
 }
 
 /**
@@ -406,32 +328,30 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
 void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master) {
     if (!wcb || !master) return;
 
-    log_debug(master->logger, "[cleanup_worker_resources] Limpiando recursos para Worker ID=%d (socket=%d)", wcb->worker_id, wcb->socket_fd);
+    log_debug(master->logger, "[cleanup_worker_resources] Limpiando recursos para Worker ID=%d (socket=%d)", 
+              wcb->worker_id, wcb->socket_fd);
 
-
-    // Remover de listas
-    if (master->workers_table && master->workers_table->idle_list) {
+    // Remover de TODAS las listas
+    if (master->workers_table) {
         list_remove_element(master->workers_table->idle_list, wcb);
-    }
-    if (master->workers_table && master->workers_table->busy_list) {
         list_remove_element(master->workers_table->busy_list, wcb);
-    }
-    if (master->workers_table && master->workers_table->disconnected_list) {
-        if (!list_find(master->workers_table->disconnected_list, (void*) wcb)) {
-            list_add(master->workers_table->disconnected_list, wcb);
+        list_remove_element(master->workers_table->worker_list, wcb);
+        
+        // Decrementar contador
+        if (master->workers_table->total_workers_connected > 0) {
+            master->workers_table->total_workers_connected--;
+            master->multiprogramming_level = master->workers_table->total_workers_connected;
         }
+
+        // Agregar a lista worker desconectados
+        list_add(master->workers_table->disconnected_list, wcb);
     }
 
-    // Reset fields
-    wcb->current_query_id = -1;
-    wcb->socket_fd = -1;
-    wcb->state = WORKER_STATE_DISCONNECTED;
-
-    // Liberar memoria de strings si existen
     if (wcb->ip_address) {
         free(wcb->ip_address);
-        wcb->ip_address = NULL;
     }
+    
+    free(wcb);
 }
 
 /**
@@ -454,4 +374,122 @@ t_worker_control_block *find_worker_by_socket(t_worker_table *table, int socket_
 
     search_worker_socket_fd = socket_fd;
     return (t_worker_control_block *)list_find(table->worker_list, match_worker_by_socket);
+}
+
+int handle_error_from_storage(t_package *required_package, int client_socket, t_master *master) {
+    if (!master || !master->queries_table) return -1;
+
+    log_debug(master->logger, "[handle_error_from_storage] Error report recibido desde worker socket %d", client_socket);
+
+    buffer_reset_offset(required_package->buffer);
+    uint32_t first_val;
+    package_read_uint32(required_package, &first_val);
+
+    // Bloquear AMBOS mutexes
+    if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
+        log_error(master->logger, "[handle_error_from_storage] Error al bloquear worker_table_mutex");
+        return -1;
+    }
+
+    if (pthread_mutex_lock(&master->queries_table->query_table_mutex) != 0) {
+        log_error(master->logger, "[handle_error_from_storage] Error al bloquear query_table_mutex");
+        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+        return -1;
+    }
+
+/*     if (!package_read_uint32(required_package, &query_id)) {
+        log_error(master->logger, "[handle_error_from_storage] Error al leer query ID del paquete");
+        goto cleanup_and_exit;
+    }
+    
+    if (query_id < 0) {
+        log_error(master->logger, "[handle_error_from_storage] Query ID inválida: %d", query_id);
+        goto cleanup_and_exit;
+    } */
+
+    char *error_msg = package_read_string(required_package);
+
+/*     // Intentar encontrar worker por ese primer valor (podría ser worker_id)
+    search_worker_id = (int)first_val;
+    t_worker_control_block *wcb = list_find(master->workers_table->worker_list, match_worker_by_id);
+
+    if (wcb) {
+        // Formato con worker_id presente. Leer query_id a continuación.
+        uint32_t worker_id = first_val;
+        if (!package_read_uint32(required_package, &query_id)) {
+            // Si no viene query_id, intentar obtenerlo desde el worker por socket
+            log_warning(master->logger, "[handle_error_from_storage] No se encontró query_id en paquete tras worker_id; intentando obtener desde worker socket %d", client_socket);
+            // buscar por socket
+            wcb = find_worker_by_socket(master->workers_table, client_socket);
+            if (!wcb) {
+                log_error(master->logger, "[handle_error_from_storage] No se encontró worker con socket %d", client_socket);
+                goto cleanup_and_exit;
+            }
+            query_id = (uint32_t) wcb->current_query_id;
+        }
+    } else {
+        // El primer valor es probablemente query_id (formato {query_id, msg})
+        query_id = first_val;
+ */
+
+    // Buscar worker por socket
+    t_worker_control_block *wcb = find_worker_by_socket(master->workers_table, client_socket);
+    if (!wcb) {
+        log_error(master->logger, "[handle_error_from_storage] No se encontró worker con socket %d", client_socket);
+        goto cleanup_and_exit;
+    }
+
+    int query_id = wcb->current_query_id;
+    if (query_id < 0) {
+        log_error(master->logger, "[handle_error_from_storage] Worker ID=%d no tiene una query asignada", wcb->worker_id);
+        goto cleanup_and_exit;
+    }
+
+    printf("Worker ID=%d reportó error en Query ID=%u\n", wcb->worker_id, query_id);
+    
+    // Buscar query
+    t_query_control_block *qcb = NULL;
+    for (int i = 0; i < list_size(master->queries_table->running_list); i++) {
+        t_query_control_block *q = list_get(master->queries_table->running_list, i);
+        if (q && q->query_id == query_id) {
+            qcb = q;
+            break;
+        }
+    }
+
+    if (!qcb) {
+        log_error(master->logger, "[handle_error_from_storage] Query ID=%u no encontrada en running_list", query_id);
+        goto cleanup_and_exit;
+    }
+
+    log_warning(master->logger, "[handle_error_from_storage] Query ID=%u reportó ERROR: %s",
+                query_id, error_msg ? error_msg : "(sin mensaje)");
+
+/*     // Actualizar estados
+    qcb->state = QUERY_STATE_CANCELED;
+    qcb->assigned_worker_id = -1;
+    
+    // Remover de running_list
+    list_remove_element(master->queries_table->running_list, qcb); */
+    
+    // Worker pasa a IDLE
+    wcb->state = WORKER_STATE_IDLE;
+    wcb->current_query_id = -1;
+    list_remove_element(master->workers_table->busy_list, wcb);
+    list_add(master->workers_table->idle_list, wcb);
+
+    // Notificar QC y hacer cleanup CON los mutexes tomados
+    finalize_query_with_error(qcb, master, error_msg ? error_msg : "Error en Storage");
+    cleanup_query_resources(qcb, master);
+
+cleanup_and_exit:
+    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+
+    if (error_msg) free(error_msg);
+
+    // Intentar despachar siguiente query
+    try_dispatch(master);
+
+    return 0;
 }

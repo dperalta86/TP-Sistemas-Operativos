@@ -41,10 +41,8 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_read_uint8(response_package, &query_priority);
 
     int assigned_id = generate_query_id(master);
-    int multiprocessing_level = master->multiprogramming_level; // TODO: Asignar el nivel real cuando esté implementado
-    
     // Responder a QC
-    t_package *query_path_package = package_create_empty(OP_QUERY_FILE_PATH);
+    t_package *query_path_package = package_create_empty(QC_OP_MASTER_CONNECTION_OK);
 
     if (!query_path_package)
     {
@@ -54,7 +52,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_send(query_path_package, client_socket);
 
     // Loggear la información recibida
-    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, multiprocessing_level);
+    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, master->multiprogramming_level);
     
     // Agregar a la tabla de queries
     t_query_control_block *qcb = create_query(master, assigned_id, query_path, query_priority, client_socket);
@@ -74,7 +72,9 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_destroy(query_path_package);
     return 0;
 disconnect:
-// TODO: manejar desconexion de QC
+free(query_path);
+if (query_path_package)
+    package_destroy(query_path_package);
 log_error(master->logger, "Error al enviar respuesta a Query Control, se desconectará...");
 return -1;
 
@@ -97,16 +97,22 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
     qcb->assigned_worker_id = -1; // Debería ser -1 al principio (sin asignar)
     qcb->program_counter = 0; // Inicia en 0, luego lo actualiza con datos desde el Worker
     qcb->state = QUERY_STATE_READY; // Inicia en READY al ser creada
+    qcb->preemption_pending = false; // No hay desalojo pendiente al inicio
+    qcb->cleaned_up = false; // No se han liberado recursos aún
     qcb->ready_timestamp = now_ms_monotonic();
 
     // Agregamos a la lista principal y a la cola de ready (teniendo en cuenta planificador)
     list_add(master->queries_table->query_list, qcb);
 
     if (strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
-        if(insert_query_by_priority(master->queries_table->ready_queue, qcb) != 0)
+        if(insert_query_by_priority(master->queries_table->ready_queue, qcb) != 0){
             log_error(master->logger, "Error al intentar insertar query (query ID: %d) en Ready Queue.", query_id);
+       
+        }
+        log_debug(master->logger, "Query id %d agregada a la Ready QUEUE (PRIORITY)", qcb->query_id);
     } else {
         list_add(master->queries_table->ready_queue, qcb);
+        log_debug(master->logger, "Query id %d agregada a la Ready QUEUE (FIFO)", qcb->query_id);
     }
 
     master->queries_table->total_queries++;
@@ -131,7 +137,6 @@ int insert_query_by_priority(t_list *ready_queue, t_query_control_block *new_qcb
             return 0; // Éxito
         }
     }
-
     // Si recorro la lista completa y todas las queries tienen mayor prioridad
     list_add(ready_queue, new_qcb);
     return 0; // Éxito

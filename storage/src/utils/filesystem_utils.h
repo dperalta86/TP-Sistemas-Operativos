@@ -17,6 +17,10 @@
 #define PHYSICAL_BLOCKS_DIR "physical_blocks"
 #define METADATA_CONFIG_FILE "metadata.config"
 
+// Estados de metadata
+#define IN_PROGRESS "WORK_IN_PROGRESS"
+#define COMMITTED "COMMITTED"
+
 /**
  * Crea una carpeta recursivamente con mkdir -p
  *

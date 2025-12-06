@@ -33,6 +33,7 @@ extern t_dictionary *g_open_files_dict;
 // semáforos
 extern pthread_mutex_t g_worker_counter_mutex;
 extern pthread_mutex_t g_storage_bitmap_mutex;
+extern pthread_mutex_t g_blocks_hash_index_mutex;
 extern pthread_mutex_t g_storage_open_files_dict_mutex;
 
 #endif

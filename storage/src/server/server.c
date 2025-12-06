@@ -25,8 +25,13 @@ void *handle_client(void *arg) {
   while (true) {
     t_package *request = package_receive(client_socket);
     if (!request) {
+      // Resta el worker que se desconecta
+      pthread_mutex_lock(&g_worker_counter_mutex);
+      g_worker_counter--;
+      pthread_mutex_unlock(&g_worker_counter_mutex);
+
       log_error(g_storage_logger,
-                "Error en la recepción de la solicitud del Worker");
+                "## Se desconecta el Worker %s. - Cantidad de workers: %d", client_data->client_id, g_worker_counter);
       goto cleanup;
     }
 
@@ -48,13 +53,13 @@ void *handle_client(void *arg) {
       response = handle_create_tag_op_package(request);
       break;
     case STORAGE_OP_TAG_COMMIT_REQ:
-      response = commit_tag(request);
+      response = handle_tag_commit_request(request);
       break;
     case STORAGE_OP_BLOCK_WRITE_REQ:
       response = handle_write_block_request(request);
       break;
     case STORAGE_OP_BLOCK_READ_REQ:
-      response = read_block(request);
+      response = handle_read_block_request(request);
       break;
     case STORAGE_OP_TAG_DELETE_REQ:
       response = handle_delete_tag_op_package(request);
@@ -71,6 +76,9 @@ void *handle_client(void *arg) {
       goto cleanup;
     }
 
+    // simulo retardo de operacion 
+    usleep(g_storage_config->operation_delay * 1000);
+    
     package_send(response, client_socket);
 
     package_destroy(response);

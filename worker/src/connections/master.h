@@ -15,7 +15,7 @@
  * @return El socket de la conexión con Master si el handshake fue exitoso, -1 en caso de error.
  */
 int handshake_with_master(const char *master_ip, const char *master_port, int worker_id);
-int send_read_content_to_master(int socket_master, int query_id, void *data, size_t data_size, int worker_id);
+int send_read_content_to_master(int socket_master, int query_id, void *data, size_t data_size, char* file, char* tag, int worker_id);
 int end_query_in_master(int socket_master, int query_id, int worker_id);
 
 #endif

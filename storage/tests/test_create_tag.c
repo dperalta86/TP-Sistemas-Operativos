@@ -102,8 +102,8 @@ context(test_create_tag) {
     it("retorna error cuando el tag origen no existe") {
       _create_file(1, "test_file", "v1", TEST_MOUNT_POINT);
 
-      int result = create_tag(4, "test_file", "nonexistent", "v2");
-      should_int(result) be equal to(-2);
+      int result = create_tag(4, "test_file", "nonexistent", "test_file", "v2");
+      should_int(result) be equal to(FILE_TAG_MISSING);
     }
     end
 

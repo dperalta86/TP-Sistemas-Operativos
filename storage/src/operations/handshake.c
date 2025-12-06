@@ -8,15 +8,15 @@ t_package* handle_handshake(t_package *package, t_client_data *client_data) {
     pthread_mutex_unlock(&g_worker_counter_mutex);
 
     // Obtiene el worker id del package recibido
-    char *worker_id = package_read_string(package);
-    if (!worker_id)
+    uint32_t worker_id;
+    if(!package_read_uint32(package, &worker_id))
     {
         log_error(g_storage_logger, "## Handshake de Worker: no se pudo obtener el worker id - Socket: %d", client_data->client_socket);
         
         return NULL;
     }
     
-    client_data->client_id = worker_id;
+    client_data->client_id = string_itoa((int)worker_id);
 
     log_info(g_storage_logger, "## Se conecta el Worker %s - Cantidad de Workers: %d", client_data->client_id, g_worker_counter);    
     log_info(g_storage_logger, "## Handshake recibido del Worker %s - Socket: %d", client_data->client_id, client_data->client_socket);

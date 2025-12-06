@@ -117,6 +117,21 @@ int create_test_superblock(const char* mount_point) {
     return 0;
 }
 
+int create_test_blocks_hash_index(const char* mount_point) {
+    char hash_index_path[PATH_MAX];
+    snprintf(hash_index_path, sizeof(hash_index_path), "%s/blocks_hash_index.config", mount_point);
+
+    FILE* hash_index_file = fopen(hash_index_path, "w");
+    if (hash_index_file == NULL) {
+        return -1;
+    }
+
+    // Archivo vacío para iniciar
+    fclose(hash_index_file);
+
+    return 0;
+}
+
 int create_test_storage_config(
     char *storage_ip, 
     char *storage_port, 
@@ -177,27 +192,36 @@ int init_logical_blocks(const char *name, const char *tag, int numb_blocks, cons
 }
 
 int create_test_metadata(const char *name, const char *tag, int numb_blocks, char *blocks_array_str, char *status, char *mount_point) {
+    int retval = 0;
     int size = numb_blocks * TEST_BLOCK_SIZE;
 
     int total_blocks = TEST_FS_SIZE / TEST_BLOCK_SIZE;
-    if (total_blocks < numb_blocks)
-        return -1;
-    
+    if (total_blocks < numb_blocks) {
+        retval = -1;
+        goto end;
+    }
+
     char **blocks_array = string_get_string_as_array(blocks_array_str);
-    if(string_array_size(blocks_array) != numb_blocks)
-        return -2;
+    if(string_array_size(blocks_array) != numb_blocks) {
+        retval = -2;
+        goto cleanup_array;
+    }
 
     char metadata_path[PATH_MAX];
     snprintf(metadata_path, sizeof(metadata_path), "%s/files/%s/%s/metadata.config", mount_point, name, tag);
     FILE* metadata_file = fopen(metadata_path, "w");
     if (metadata_file == NULL) {
-        return -3;
+        retval = -3;
+        goto cleanup_array;
     }
 
     fprintf(metadata_file, "SIZE=%d\nBLOCKS=%s\nESTADO=%s\n", size, blocks_array_str, status);
     fclose(metadata_file);
 
-    return 0;
+cleanup_array:
+    string_array_destroy(blocks_array);
+end:
+    return retval;
 }
 
 bool correct_unlock(const char *name, const char *tag) {
@@ -221,3 +245,83 @@ int mutex_is_free(pthread_mutex_t *mutex) {
     }
     return -1;
 }
+
+void package_simulate_reception(t_package *package)
+{
+    if (!package || !package->buffer) {
+        return;
+    }
+    
+    package->buffer->size = package->buffer->offset;
+    
+    package_reset_read_offset(package);
+}
+
+void write_physical_block_content(int physical_id, const char *content, size_t content_size) {
+    char ph_block_path[PATH_MAX];
+    snprintf(ph_block_path, sizeof(ph_block_path), "%s/physical_blocks/block%04d.dat", 
+             TEST_MOUNT_POINT, physical_id);
+    
+    FILE *f = fopen(ph_block_path, "w");
+    if (f) {
+        fwrite(content, 1, content_size, f);
+        // Rellenar con ceros para alcanzar block_size para el hashing (asumiendo block_size=100)
+        size_t block_size = g_storage_config->block_size;
+        if (content_size < block_size) {
+            char *zeros = calloc(1, block_size - content_size);
+            fwrite(zeros, 1, block_size - content_size, f);
+            free(zeros);
+        }
+        fclose(f);
+    }
+}
+
+void link_logical_to_physical(const char *name, const char *tag, int logical_id, int physical_id) {
+    // Rutas de bloques
+    char ph_block_path[PATH_MAX];
+    snprintf(ph_block_path, sizeof(ph_block_path), "%s/physical_blocks/block%04d.dat", 
+             TEST_MOUNT_POINT, physical_id);
+
+    char lg_block_path[PATH_MAX];
+    snprintf(lg_block_path, sizeof(lg_block_path), "%s/files/%s/%s/logical_blocks/%04d.dat", 
+             TEST_MOUNT_POINT, name, tag, logical_id);
+
+    // Eliminar el link viejo si existe (importante para la reasignación)
+    remove(lg_block_path); 
+    
+    // Crear el hard link nuevo
+    if (link(ph_block_path, lg_block_path) != 0) {
+        log_error(g_storage_logger, "Falló la creación del hardlink en el setup.");
+    }
+}
+
+char* get_hash_index_config_path(char *buffer) {
+    snprintf(buffer, PATH_MAX, "%s/blocks_hash_index.config", TEST_MOUNT_POINT);
+    return buffer;
+}
+
+void bitmap_close(t_bitarray *bitmap, char *buffer) {
+    if (bitmap) {
+        bitarray_destroy(bitmap);
+    }
+    if (buffer) {
+        free(buffer);
+    }
+    
+    pthread_mutex_unlock(&g_storage_bitmap_mutex);
+}
+
+void define_bitmap_bit(off_t bit_index, bool value) {
+    t_bitarray *bitmap = NULL;
+    char *bitmap_buffer = NULL;
+    bitmap_load(&bitmap, &bitmap_buffer);
+
+    if (value) {
+        bitarray_set_bit(bitmap, bit_index);
+    } else {
+        bitarray_clean_bit(bitmap, bit_index);
+    }
+
+    bitmap_persist(bitmap, bitmap_buffer);
+}
+

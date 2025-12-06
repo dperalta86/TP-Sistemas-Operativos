@@ -2,6 +2,7 @@
 #include "../file_locks.h"
 #include "../utils/filesystem_utils.h"
 #include "globals/globals.h"
+#include "error_messages.h"
 #include <commons/config.h>
 #include <commons/string.h>
 #include <limits.h>
@@ -17,7 +18,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
                   int new_size_bytes, const char *mount_point) {
   int retval = 0;
 
-  lock_file(name, tag);
+  //lock_file(name, tag, true);
   t_file_metadata *metadata = read_file_metadata(mount_point, name, tag);
 
   if (!metadata) {
@@ -62,7 +63,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     char target_path[PATH_MAX];
     char physical_block_zero_path[PATH_MAX];
     snprintf(physical_block_zero_path, sizeof(physical_block_zero_path),
-             "%s/physical_blocks/0000.dat", mount_point);
+             "%s/physical_blocks/block0000.dat", mount_point);
 
     for (int i = old_block_count; i < new_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
@@ -95,13 +96,13 @@ update_size:
   }
 
   log_info(g_storage_logger,
-           "## %u - File Truncado: %s:%s - Nuevo Tamaño: %d bytes", query_id,
+           "## Query ID: %u - File Truncado: %s:%s - Nuevo Tamaño: %d bytes", query_id,
            name, tag, new_size_bytes);
 
 clean_metadata:
   destroy_file_metadata(metadata);
 unlock_only:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
   return retval;
 }
 
@@ -138,6 +139,22 @@ t_package *handle_truncate_file_op_package(t_package *package) {
 
   free(name);
   free(tag);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("TRUNCATE_FILE error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Error al crear el paquete de error para TRUNCATE_FILE");
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_FILE_TRUNCATE_RES);
   if (!response) {

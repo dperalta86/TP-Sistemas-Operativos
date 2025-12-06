@@ -1,0 +1,31 @@
+CREATE ZELDA_SERIES:V1
+TRUNCATE ZELDA_SERIES:V1 8192
+WRITE ZELDA_SERIES:V1 0 The_Legend_of_Zelda
+WRITE ZELDA_SERIES:V1 64 Zelda_II_The_Adventure_of_Link
+WRITE ZELDA_SERIES:V1 128 The_Legend_of_Zelda_A_Link_to_the_Past
+WRITE ZELDA_SERIES:V1 192 The_Legend_of_Zelda_Link_s_Awakening
+WRITE ZELDA_SERIES:V1 256 The_Legend_of_Zelda_Ocarina_of_Time
+WRITE ZELDA_SERIES:V1 320 The_Legend_of_Zelda_Majoras_Mask
+WRITE ZELDA_SERIES:V1 384 The_Legend_of_Zelda_Oracle_of_Seasons
+WRITE ZELDA_SERIES:V1 448 The_Legend_of_Zelda_Oracle_of_Ages
+WRITE ZELDA_SERIES:V1 512 The_Legend_of_Zelda_Four_Swords
+WRITE ZELDA_SERIES:V1 576 The_Legend_of_Zelda_The_Wind_Waker
+WRITE ZELDA_SERIES:V1 640 The_Legend_of_Zelda_Four_Swords_Adventures
+WRITE ZELDA_SERIES:V1 704 The_Legend_of_Zelda_The_Minish_Cap
+WRITE ZELDA_SERIES:V1 768 The_Legend_of_Zelda_Twilight_Princess
+WRITE ZELDA_SERIES:V1 832 The_Legend_of_Zelda_Phantom_Hourglass
+WRITE ZELDA_SERIES:V1 896 The_Legend_of_Zelda_Spirit_Tracks
+WRITE ZELDA_SERIES:V1 960 The_Legend_of_Zelda_Skyward_Sword
+WRITE ZELDA_SERIES:V1 1024 The_Legend_of_Zelda_A_Link_Between_Worlds
+WRITE ZELDA_SERIES:V1 1088 The_Legend_of_Zelda_Tri_Force_Heroes
+WRITE ZELDA_SERIES:V1 1152 The_Legend_of_Zelda_Breath_of_the_Wild
+WRITE ZELDA_SERIES:V1 1216 The_Legend_of_Zelda_Tears_of_the_Kingdom
+WRITE ZELDA_SERIES:V1 1280 The_Legend_of_Zelda_Echoes_of_Wisdom
+WRITE ZELDA_SERIES:V1 1344 The_Legend_of_Zelda_Link_s_Awakening_DX
+WRITE ZELDA_SERIES:V1 1408 The_Legend_of_Zelda_Ocarina_of_Time_Master_Quest
+WRITE ZELDA_SERIES:V1 1472 The_Legend_of_Zelda_Twilight_Princess_HD
+WRITE ZELDA_SERIES:V1 1536 The_Legend_of_Zelda_Skyward_Sword_HD
+WRITE ZELDA_SERIES:V1 1600 The_Legend_of_Zelda_Link_s_Awakening_Remake
+FLUSH ZELDA_SERIES:V1
+COMMIT ZELDA_SERIES:V1
+END

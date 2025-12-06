@@ -107,16 +107,13 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     t_package *response_package = package_receive(master_socket);
 
-    if (!response_package) {
-        retval = fail_pkg(logger, "Error al recibir respuesta de handshake", &response_package, -6);
-        goto clean_socket;
-    }
-    if (response_package->operation_code != OP_QUERY_HANDSHAKE) {
+    if (!response_package || response_package->operation_code != OP_QUERY_HANDSHAKE) {
         retval = fail_pkg(logger, "Handshake inválido (opcode inesperado)", &response_package, -6);
         goto clean_socket;
     }
 
     package_destroy(response_package);
+    response_package = NULL; 
     
     log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s.", query_control_config->ip, query_control_config->port);
 
@@ -171,13 +168,13 @@ int main(int argc, char* argv[])
 
     switch (resp->operation_code) {
 
-        case QC_OP_READ_DATA: {
-
-            char* file_tag = package_read_string(resp);  
+        case QC_OP_READ_DATA: {    
             size_t size = 0; 
-            void* file_data = package_read_data(resp, &size);
+            void* file_data = buffer_read_data(resp->buffer, &size);
+            char* file_tag = buffer_read_string(resp->buffer);
 
             if(file_tag == NULL){
+                free(file_data);
                 retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
                 goto clean_socket;
 
@@ -189,38 +186,62 @@ int main(int argc, char* argv[])
                  goto clean_socket;             
             } 
 
-
-            char* contenido = malloc(size + 1);
-
-            if (!contenido) {
-                retval = fail_pkg(logger, "Memoria insuficiente al procesar READ_DATA", &resp, -7);
-                free(file_tag); free(file_data);
-                goto clean_socket;
+            // Imprimo byte a byte, reemplazando no imprimibles por '.'
+            char* printable = malloc(size + 1);
+            for (size_t i = 0; i < size; i++) {
+                unsigned char c = ((unsigned char*)file_data)[i];
+                printable[i] = (c >= 32 && c <= 126) ? c : '.';
             }
-            memcpy(contenido, file_data, size);
-            contenido[size] = '\0';
+            printable[size] = '\0';
 
-            // Estructura <File:Tag> debe venir de master en un solo string listo para logear
-            log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
+            log_info(logger, "## Lectura realizada: <%s>, contenido(%zu bytes): %s",
+                    file_tag, size, printable);
 
+            free(printable);
             free(file_tag);
             free(file_data);
-            free(contenido);
         } break;
 
-        case QC_OP_MASTER_FIN_DESCONEXION:
-        case QC_OP_MASTER_FIN_PRIORIDAD: {
-
-
-            const char* motivoString =
-            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
-
-            log_info(logger, "## Query Finalizada - %s", motivoString);
-
-            package_destroy(resp); resp = NULL;
-            retval = 0;
-            goto clean_socket;
-        } break;
+        // QC_OP_MASTER_FIN_DESCONEXION y OP_END_QUERY indican la finalización de la query,
+        // pero QC_OP_MASTER_FIN_DESCONEXION también incluye mensaje con motivo de finalización.
+                case QC_OP_MASTER_FIN_DESCONEXION: 
+                case OP_END_QUERY: {
+                    char* reason_string = NULL;
+                    bool motivo_alocado = false;
+                    
+                    if (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) {
+                        package_reset_read_offset(resp);
+                        uint32_t qid = 0;
+                        /* package_read_uint32 retorna true si lee exitosamente */
+                        if (package_read_uint32(resp, &qid)) {
+                            /* Éxito: leer el mensaje de error */
+                            char *msg = package_read_string(resp);
+                            if (msg) {
+                                reason_string = msg;
+                                motivo_alocado = true;
+                            } else {
+                                reason_string = (char*)"Error desconocido en Storage (sin mensaje)";
+                            }
+                        } else {
+                            /* Fallo al leer query_id: usar mensaje por defecto */
+                            reason_string = (char*)"Finalización por error en Storage";
+                        }
+                    } else {
+                        /* OP_END_QUERY: finalización normal */
+                        reason_string = (char*)"Finalización normal de la Query";
+                    }
+                    
+                    log_info(logger, "## Query Finalizada - %s", reason_string);
+        
+                    package_destroy(resp);
+                    retval = 0;
+                    
+                    /* Liberar SOLO si fue alocado por package_read_string */
+                    if (motivo_alocado && reason_string) {
+                        free(reason_string);
+                    }
+                    goto clean_socket;
+                } break;
         
         default:
             log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);
@@ -231,7 +252,6 @@ int main(int argc, char* argv[])
     package_destroy(resp);
 }
 
-    package_destroy(response_package);
 
 clean_socket:
     close(master_socket);

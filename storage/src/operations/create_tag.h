@@ -35,4 +35,6 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
  */
 t_package *handle_create_tag_op_package(t_package *package);
 
+int create_metadata(const char *name, const char *tag, int size, int numb_blocks, char *blocks_array_str, char *status, char *mount_point);
+
 #endif

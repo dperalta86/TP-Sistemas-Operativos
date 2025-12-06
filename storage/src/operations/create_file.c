@@ -1,5 +1,6 @@
 #include "create_file.h"
 #include "utils/filesystem_utils.h"
+#include "error_messages.h"
 #include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -24,7 +25,7 @@ int _create_file(uint32_t query_id, const char *name, const char *tag,
     return -2;
   }
 
-  log_info(g_storage_logger, "## %u - File Creado: %s:%s", query_id, name, tag);
+  log_info(g_storage_logger, "## Query ID: %u - File Creado: %s:%s", query_id, name, tag);
 
   return 0;
 }
@@ -52,6 +53,22 @@ t_package *create_file(t_package *package) {
 
   free(name);
   free(tag);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("CREATE_FILE error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Error al crear el paquete de error para CREATE_FILE");
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_FILE_CREATE_RES);
   if (!response) {

@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
     
     // Inicio el servidor
     int server_socket_fd = start_server(master->ip, master->port);
+    master->running = true;
 
     // Inicio hilo aging (si estoy en priotidad)
     if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
@@ -107,7 +108,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        log_info(logger, "Cliente conectado en socket %d", client_socket_fd);
+        log_debug(logger, "Cliente conectado en socket %d", client_socket_fd);
 
         t_client_data *client_data = malloc(sizeof(t_client_data));
         if (client_data == NULL) {
@@ -145,15 +146,15 @@ void* handle_client(void* arg) {
     t_client_data *client_data = (t_client_data*)arg;
     int client_socket = client_data->client_socket;
     t_master *master = client_data->master;
-    // Variables para identificar tipo de cliente y manejar desconexiones
-    bool is_query_control = false;
-    bool is_worker = false;
+
+    // flags para identificar tipo de cliente y manejar desconexiones
+    bool is_query_control = false, is_worker = false;
 
     while (1) {
         t_package *required_package = package_receive(client_socket);
 
         if (required_package == NULL) {
-            log_error(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
+            log_debug(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
             
             // Manejar desconexión según tipo de cliente identificado
             if (is_query_control) {
@@ -174,7 +175,8 @@ void* handle_client(void* arg) {
             case OP_QUERY_HANDSHAKE:
                 log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
                 if (manage_query_handshake(client_socket, master->logger) == 0) {
-                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
+                    is_query_control = true;
+                    log_debug(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
                 }       
                 break;
             case OP_QUERY_FILE_PATH:
@@ -192,7 +194,8 @@ void* handle_client(void* arg) {
             case OP_WORKER_HANDSHAKE_REQ:
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
-                    log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
+                    is_worker = true;
+                    log_debug(master->logger, "Handshake completado con worker en socket %d", client_socket);
                 }              
                 break;
             case OP_WORKER_READ_MESSAGE_REQ:
@@ -201,9 +204,22 @@ void* handle_client(void* arg) {
                     log_error(master->logger, "Error al manejar OP_WORKER_READ_MESSAGE del cliente %d", client_socket);
                 }
                 break;
+            case OP_WORKER_END_QUERY:
+                log_debug(master->logger, "Recibido OP_WORKER_END_QUERY en socket %d", client_socket);
+                if (manage_worker_end_query(required_package->buffer, client_socket, master) != 0) {
+                    log_error(master->logger, "Error al manejar OP_WORKER_END_QUERY desde socket %d", client_socket);
+                }                
+                break;
+            case OP_WORKER_EVICT_RES:
+                log_debug(master->logger, "Recibido OP_WORKER_EVICT_RES en socket %d", client_socket);
+                manage_worker_evict_response(client_socket, required_package, master);
+                break;
             case WORKER_OP_DISCONNECTION:
                 log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);
                 handle_worker_disconnection(client_socket, master);
+                break;
+            case STORAGE_OP_ERROR:
+                handle_error_from_storage(required_package, client_socket, master);
                 break;
             default:
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);

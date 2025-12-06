@@ -1,0 +1,32 @@
+CREATE OST_NFSMW:V1
+TRUNCATE OST_NFSMW:V1 8192
+WRITE OST_NFSMW:V1 0 Styles_of_Beyond_-_Nine_Thou__Superstars_Remix_
+WRITE OST_NFSMW:V1 64 The_Prodigy_-_Youll_Be_Under_My_Wheels
+WRITE OST_NFSMW:V1 128 Disturbed_-_Decadence
+WRITE OST_NFSMW:V1 192 Avenged_Sevenfold_-_Blinded_in_Chains
+WRITE OST_NFSMW:V1 256 Bullet_for_My_Valentine_-_Hand_of_Blood
+WRITE OST_NFSMW:V1 320 Static-X_-_Skinnyman
+WRITE OST_NFSMW:V1 384 Celldweller_-_Shapeshifter__feat._Styles_of_Beyond_
+WRITE OST_NFSMW:V1 448 DJ_Spooky_-_Babylon_Station
+WRITE OST_NFSMW:V1 512 The_Roots_-_Dont_Say_Nuthin
+WRITE OST_NFSMW:V1 576 Snoop_Dogg_-_Riders_on_the_Storm__Fredwreck_Remix_
+WRITE OST_NFSMW:V1 640 Jamiroquai_-_Feels_Just_Like_It_Should__Timo_Maas_Remix_
+WRITE OST_NFSMW:V1 704 TI_-_Do_Ya_Thang
+WRITE OST_NFSMW:V1 768 Hush_-_Fired_Up
+WRITE OST_NFSMW:V1 832 Stratus_-_You_Must_Follow
+WRITE OST_NFSMW:V1 896 Paul_Linford_&_Chris_Vrenna_-_Most_Wanted_Theme
+WRITE OST_NFSMW:V1 960 Royksopp_-_What_Else_Is_There__Thin_White_Duke_Mix_
+READ OST_NFSMW:V1 0 128
+READ OST_NFSMW:V1 448 256
+READ OST_NFSMW:V1 896 128
+TAG OST_NFSMW:V1 OST_NFSMW:BKP
+TRUNCATE OST_NFSMW:BKP 4096
+WRITE OST_NFSMW:BKP 0 Backup_OST_generated
+READ OST_NFSMW:BKP 0 256
+FLUSH OST_NFSMW:V1
+COMMIT OST_NFSMW:V1
+WRITE OST_NFSMW:BKP 64 Backup_updated_line
+COMMIT OST_NFSMW:BKP
+DELETE OST_NFSMW:BKP
+FLUSH OST_NFSMW:V1
+END
