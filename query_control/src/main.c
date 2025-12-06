@@ -186,8 +186,18 @@ int main(int argc, char* argv[])
                  goto clean_socket;             
             } 
 
-            log_info(logger, "## Lectura realizada:  <%s>, contenido: %s", file_tag, (char*)file_data);
+            // Imprimo byte a byte, reemplazando no imprimibles por '.'
+            char* printable = malloc(size + 1);
+            for (size_t i = 0; i < size; i++) {
+                unsigned char c = ((unsigned char*)file_data)[i];
+                printable[i] = (c >= 32 && c <= 126) ? c : '.';
+            }
+            printable[size] = '\0';
 
+            log_info(logger, "## Lectura realizada: <%s>, contenido(%zu bytes): %s",
+                    file_tag, size, printable);
+
+            free(printable);
             free(file_tag);
             free(file_data);
         } break;
