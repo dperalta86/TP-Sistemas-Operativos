@@ -43,4 +43,7 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master);
 // Limpia los recursos asociados a un worker
 void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master);
 
+// Maneja errores recibidos desde el Storage
+int handle_error_from_storage(t_package *pkg, int storage_socket, t_master *master);
+
 #endif // DISCONNECTION_HANDLER_H

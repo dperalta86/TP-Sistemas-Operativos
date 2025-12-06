@@ -209,7 +209,7 @@ t_file_metadata *read_file_metadata(const char *mount_point,
 
   t_config *config = config_create(metadata_path);
   if (!config) {
-    log_error(g_storage_logger, "No se pudo abrir el metadata.config: %s",
+    log_debug(g_storage_logger, "No se pudo abrir el metadata.config: %s",
               metadata_path);
     return NULL;
   }

@@ -72,7 +72,9 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_destroy(query_path_package);
     return 0;
 disconnect:
-// TODO: manejar desconexion de QC
+free(query_path);
+if (query_path_package)
+    package_destroy(query_path_package);
 log_error(master->logger, "Error al enviar respuesta a Query Control, se desconectará...");
 return -1;
 

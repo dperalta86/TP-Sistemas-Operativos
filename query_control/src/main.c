@@ -192,19 +192,46 @@ int main(int argc, char* argv[])
             free(file_data);
         } break;
 
-        case QC_OP_MASTER_FIN_DESCONEXION:
-        case OP_MASTER_QUERY_END: {
-
-
-            const char* motivoString =
-            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "finalización de Query";
-
-            log_info(logger, "## Query Finalizada - %s", motivoString);
-
-            package_destroy(resp); resp = NULL;
-            retval = 0;
-            goto clean_socket;
-        } break;
+        // QC_OP_MASTER_FIN_DESCONEXION y OP_END_QUERY indican la finalización de la query,
+        // pero QC_OP_MASTER_FIN_DESCONEXION también incluye mensaje con motivo de finalización.
+                case QC_OP_MASTER_FIN_DESCONEXION: 
+                case OP_END_QUERY: {
+                    char* reason_string = NULL;
+                    bool motivo_alocado = false;
+                    
+                    if (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) {
+                        package_reset_read_offset(resp);
+                        uint32_t qid = 0;
+                        /* package_read_uint32 retorna true si lee exitosamente */
+                        if (package_read_uint32(resp, &qid)) {
+                            /* Éxito: leer el mensaje de error */
+                            char *msg = package_read_string(resp);
+                            if (msg) {
+                                reason_string = msg;
+                                motivo_alocado = true;
+                            } else {
+                                reason_string = (char*)"Error desconocido en Storage (sin mensaje)";
+                            }
+                        } else {
+                            /* Fallo al leer query_id: usar mensaje por defecto */
+                            reason_string = (char*)"Finalización por error en Storage";
+                        }
+                    } else {
+                        /* OP_END_QUERY: finalización normal */
+                        reason_string = (char*)"Finalización normal de la Query";
+                    }
+                    
+                    log_info(logger, "## Query Finalizada - %s", reason_string);
+        
+                    package_destroy(resp);
+                    retval = 0;
+                    
+                    /* Liberar SOLO si fue alocado por package_read_string */
+                    if (motivo_alocado && reason_string) {
+                        free(reason_string);
+                    }
+                    goto clean_socket;
+                } break;
         
         default:
             log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);

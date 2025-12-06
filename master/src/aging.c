@@ -2,6 +2,7 @@
 #include "worker_manager.h"
 #include "init_master.h"
 #include "aging.h"
+#include "scheduler.h"
 #include "disconnection_handler.h"
 #include <unistd.h>
 #include <commons/log.h>
@@ -20,6 +21,7 @@ void *aging_thread_func(void *arg) {
         }else{
             usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
         }
+        //try_dispatch(master); // Intentar despachar queries pendientes (por errores)
 
         uint64_t now = now_ms_monotonic();
 
@@ -135,8 +137,9 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return -1;
 
     if (qcb->preemption_pending) {
-        // Ya hay un desalojo en curso para esta query
-        // No hacer nada
+        log_debug(master->logger,
+            "[preempt_query_in_exec] Query ID=%d ya tiene desalojo pendiente",
+            qcb->query_id);
         return 0;
     }
 
@@ -152,21 +155,27 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
             qcb->query_id
         );
 
-        finalize_query_with_error(qcb, master, "Error en preemption");
+        finalize_query_with_error(qcb, master, "Error en preemption - worker inválido");
         cleanup_query_resources(qcb, master);
         return -1;
     }
 
-    // Marcar que hay un desalojo pendiente
     qcb->preemption_pending = true;
 
-    // Envío solicitud de desalojo, la respuesta la manejo en el worker_manager
+    // Envío solicitud de desalojo
     t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
     package_add_uint32(pkg, (uint32_t)qcb->query_id);
-    package_send(pkg, worker->socket_fd);
+    
+    if (package_send(pkg, worker->socket_fd) != 0) {
+        log_error(master->logger,
+            "[preempt_query_in_exec] Error al enviar solicitud de desalojo al Worker ID=%d",
+            worker->worker_id);
+        qcb->preemption_pending = false; 
+        package_destroy(pkg);
+        return -1;
+    }
+    
     package_destroy(pkg);
-
-
 
     log_info(master->logger,
         "## Se desaloja la Query id: %d (<PRIORIDAD: %d>) del Worker <WORKER_ID: %d> - Motivo: <PRIORIDAD>",

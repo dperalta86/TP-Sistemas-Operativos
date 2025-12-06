@@ -45,6 +45,7 @@ typedef struct
     int storage_socket;
     int worker_id;
     int query_id;
+    int master_socket;
     frame_table_t frame_table;
     char *last_victim_file;
     char *last_victim_tag;
@@ -56,6 +57,7 @@ typedef struct
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy, int retardation_ms);
 void mm_destroy(memory_manager_t *mm);
 void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int worker_id);
+void mm_set_master_connection(memory_manager_t *mm, int master_socket);
 void mm_set_query_id(memory_manager_t *mm, int query_id);
 
 page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag);

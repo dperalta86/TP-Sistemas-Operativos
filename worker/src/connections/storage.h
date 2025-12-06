@@ -25,9 +25,9 @@ int handshake_with_storage(const char *storage_ip, const char *storage_port, int
  */
 int get_block_size(int storage_socket, uint16_t *block_size, int worker_id);
 
-int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int worker_id);
-int create_file_in_storage(int storage_socket, int worker_id, char *file, char *tag);
-int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t size, int worker_id);
+int read_block_from_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int worker_id);
+int create_file_in_storage(int storage_socket, int master_socket, int worker_id, char *file, char *tag);
+int truncate_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, size_t size, int worker_id);
 
 /**
  * Realiza un fork (instrucción TAG) de un archivo en el Storage.
@@ -39,9 +39,10 @@ int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t s
  * @param worker_id El ID del Worker.
  * @return 0 si la operación fue exitosa, -1 en caso de error.
  */
-int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id);
-int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker_id);
-int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker_id);
-int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t block_number, void *data, size_t size, int worker_id);
+int fork_file_in_storage(int storage_socket, int master_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id);
+int commit_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, int worker_id);
+int delete_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, int worker_id);
+int write_block_to_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void *data, size_t size, int worker_id);
 
+void handler_error_from_storage(t_package *result, int master_socket, int worker_id);
 #endif

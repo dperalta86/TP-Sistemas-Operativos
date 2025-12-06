@@ -25,7 +25,7 @@ typedef enum {
     OP_ASSIGN_QUERY,
     OP_EJECT_QUERY,
     OP_END_QUERY,
-    OP_MASTER_QUERY_END,
+    OP_MASTER_QUERY_ERROR,
 } t_master_op_code;
 
 typedef enum {
@@ -47,6 +47,8 @@ typedef enum {
   STORAGE_OP_WORKER_GET_BLOCK_SIZE_RES,
   STORAGE_OP_WORKER_SEND_ID_REQ,
   STORAGE_OP_WORKER_SEND_ID_RES,
+  STORAGE_OP_ACK,
+  STORAGE_OP_ERROR,
 } t_storage_op_code;
 
 #endif

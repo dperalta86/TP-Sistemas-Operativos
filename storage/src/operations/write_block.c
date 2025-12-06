@@ -1,4 +1,5 @@
 #include "write_block.h"
+#include "error_messages.h"
 #include <linux/limits.h>
 
 t_package *handle_write_block_request(t_package *package) {
@@ -21,6 +22,23 @@ t_package *handle_write_block_request(t_package *package) {
   free(name);
   free(tag);
   free(block_data);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("WRITE_BLOCK error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %d - Fallo al crear paquete de error.",
+                query_id);
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_BLOCK_WRITE_RES);
   if (!response) {
@@ -195,7 +213,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
   char *bitmap_buffer = NULL;
   int retval = 0;
 
-  lock_file(name, tag, true);
+  //lock_file(name, tag, true);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -315,7 +333,7 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
 
   return retval;
 }

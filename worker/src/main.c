@@ -69,6 +69,9 @@ int main(int argc, char *argv[])
     socket_master = handshake_with_master(config->master_ip, config->master_port, worker_id);
     if (socket_master < 0)
         goto cleanup;
+    
+    /* Informar al memory manager cuál es el master socket para notificar errores de Storage */
+    mm_set_master_connection(mm, socket_master);
         
     /* Crear estado global */
     worker_state_t state = {

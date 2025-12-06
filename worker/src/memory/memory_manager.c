@@ -68,6 +68,7 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     mm->entries = NULL;
     mm->storage_socket = -1;
     mm->worker_id = -1;
+    mm->master_socket = -1;
     mm->query_id = -1;
     mm->last_victim_file = NULL;
     mm->last_victim_tag = NULL;
@@ -101,6 +102,14 @@ void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int wor
 
     mm->storage_socket = storage_socket;
     mm->worker_id = worker_id;
+}
+
+void mm_set_master_connection(memory_manager_t *mm, int master_socket)
+{
+    if (!mm)
+        return;
+
+    mm->master_socket = master_socket;
 }
 
 void mm_set_query_id(memory_manager_t *mm, int query_id)
@@ -249,7 +258,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     uint32_t block_number = page_number;
     void *data = NULL;
     size_t size = 0;
-    int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->query_id);
+    int result = read_block_from_storage(mm->storage_socket, mm->master_socket, file, tag, block_number, &data, &size, mm->query_id);
 
     if (result == 0 && data != NULL && size > 0)
     {
@@ -263,6 +272,19 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
             memset((uint8_t *)frame_addr + copy_size, 0, mm->page_size - copy_size);
         }
         free(data);
+    }
+    else if (result != 0 && result != -2)
+    {
+        // Error real en Storage (result == -1) o error desconocido: propagar error
+        if (logger)
+        {
+            log_error(logger, "Query %d: Error al leer bloque %d del archivo %s:%s desde Storage (result=%d)",
+                     mm->query_id, block_number, file, tag, result);
+        }
+        if (data)
+            free(data);
+        mm_free_frame(mm, frame);
+        return -1;
     }
     else
     {
@@ -356,7 +378,6 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         if (bytes_to_copy > remaining)
             bytes_to_copy = remaining;
 
-        usleep(mm->memory_retardation * 1000);
         if (write)
             memcpy(frame_addr + offset, ptr, bytes_to_copy);
         else
@@ -401,6 +422,9 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         current_page++;
         offset = 0;
     }
+
+    // Retardo de memoria simulado
+    usleep(mm->memory_retardation * 1000);
 
     return 0;
 }
@@ -571,10 +595,10 @@ int mm_flush_query(memory_manager_t *mm, char *file, char *tag)
             return -1;
         }
 
-        int write_res = write_block_to_storage(mm->storage_socket,
-                                               file, tag, p->page_number,
-                                               frame_addr, mm->page_size,
-                                               mm->query_id);
+        int write_res = write_block_to_storage(mm->storage_socket, mm->master_socket,
+                               file, tag, p->page_number,
+                               frame_addr, mm->page_size,
+                               mm->query_id);
         if (write_res != 0)
         {
             if (logger)
@@ -664,7 +688,7 @@ int mm_flush_all_dirty(memory_manager_t *mm)
                 return -1;
             }
 
-            int write_res = write_block_to_storage(mm->storage_socket,
+            int write_res = write_block_to_storage(mm->storage_socket, mm->master_socket,
                                                    file, tag, p->page_number,
                                                    frame_addr, mm->page_size,
                                                    mm->query_id);
@@ -747,7 +771,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
     uint32_t victim_frame = (uint32_t)-1;
     char *victim_file = NULL;
     char *victim_tag = NULL;
-    uint32_t victim_page = (uint32_t)-1;
+    uint32_t victim_page = UINT32_MAX;
     page_table_t *victim_pt = NULL;
 
     uint32_t total_pages_checked = 0;
@@ -786,7 +810,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
                  victim_frame != (uint32_t)-1 ? "Sí" : "No");
     }
 
-    if (victim_frame == (uint32_t)-1)
+    if (victim_frame == UINT32_MAX)
     {
         if (logger)
         {
@@ -814,8 +838,8 @@ int mm_find_lru_victim(memory_manager_t *mm)
 
         void *frame_addr = mm_get_frame_address(mm, victim_frame);
 
-        int write_result = write_block_to_storage(
-            mm->storage_socket,
+            int write_result = write_block_to_storage(
+            mm->storage_socket, mm->master_socket,
             victim_file,
             victim_tag,
             victim_page,
@@ -981,7 +1005,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
             void *frame_addr = mm_get_frame_address(mm, dirty_candidate_frame);
 
             int write_result = write_block_to_storage(
-                mm->storage_socket,
+                mm->storage_socket, mm->master_socket,
                 dirty_entry->file,
                 dirty_entry->tag,
                 dirty_page_idx,

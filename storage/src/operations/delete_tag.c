@@ -1,6 +1,7 @@
 #include "delete_tag.h"
 #include "errors.h"
 #include "file_locks.h"
+#include "error_messages.h"
 #include <string.h>
 
 int delete_tag(uint32_t query_id, const char *name, const char *tag,
@@ -15,7 +16,7 @@ int delete_tag(uint32_t query_id, const char *name, const char *tag,
     return -1;
   }
 
-  lock_file(name, tag, true);
+  //lock_file(name, tag, true);
 
   t_file_metadata *metadata = read_file_metadata(mount_point, name, tag);
   if (!metadata) {
@@ -53,7 +54,7 @@ int delete_tag(uint32_t query_id, const char *name, const char *tag,
 clean_metadata:
   destroy_file_metadata(metadata);
 end:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
 
   return retval;
 }
@@ -84,6 +85,22 @@ t_package *handle_delete_tag_op_package(t_package *package) {
 
   free(name);
   free(tag);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("DELETE_TAG error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Error al crear el paquete de error para DELETE_TAG");
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_TAG_DELETE_RES);
   if (!response) {

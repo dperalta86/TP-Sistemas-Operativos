@@ -214,10 +214,9 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
     if (instruction == NULL || memory_manager == NULL) {
         return -1;
     }
-
     switch(instruction->operation) {
         case CREATE: {
-            int result = create_file_in_storage(socket_storage, query_id, instruction->file_tag.file, instruction->file_tag.tag);
+            int result = create_file_in_storage(socket_storage, socket_master, query_id, instruction->file_tag.file, instruction->file_tag.tag);
             if (result != 0) {
                 return -1;
             }
@@ -227,7 +226,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (instruction->truncate.size % memory_manager->page_size != 0) {
                 return -1;
             }
-            int result = truncate_file_in_storage(socket_storage, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size, query_id);
+            int result = truncate_file_in_storage(socket_storage, socket_master, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size, query_id);
             if (result != 0) {
                 return -1;
             }
@@ -275,14 +274,14 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             break;
         }
         case TAG:
-            fork_file_in_storage(socket_storage, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst, query_id);
+            fork_file_in_storage(socket_storage, socket_master, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst, query_id);
             break;
         case COMMIT: {
             int flush_result = mm_flush_query(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
             if (flush_result != 0) {
                 return -1;
             }
-            int result = commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, query_id);
+            int result = commit_file_in_storage(socket_storage, socket_master, instruction->file_tag.file, instruction->file_tag.tag, query_id);
             if (result != 0) {
                 return -1;
             }
@@ -299,7 +298,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (mm_has_page_table(memory_manager, instruction->file_tag.file, instruction->file_tag.tag)) {
                 mm_remove_page_table(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
             }
-            int result = delete_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, query_id);
+            int result = delete_file_in_storage(socket_storage, socket_master, instruction->file_tag.file, instruction->file_tag.tag, query_id);
             if (result != 0) {
                 return -1;
             }

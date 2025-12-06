@@ -1,35 +1,52 @@
 #include "commit_tag.h"
+#include "error_messages.h"
 
 t_package *handle_tag_commit_request(t_package *package) {
   uint32_t query_id;
+  t_package *response = NULL;
   char *name = NULL;
   char *tag = NULL;
-
   if (deserialize_tag_commit_request(package, &query_id, &name, &tag) < 0) {
     return NULL;
   }
 
   int operation_result = execute_tag_commit(query_id, name, tag);
 
+  if (operation_result != 0) {
+    char *error_message = string_from_format("COMMIT_TAG error: %s", storage_error_message(operation_result));
+    response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Fallo al crear paquete de error.",
+                query_id);
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+  } else {
+    response = package_create_empty(STORAGE_OP_TAG_COMMIT_RES);
+
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",
+                query_id);
+      return NULL;
+    }
+
+    if (!package_add_int8(response, (int8_t)operation_result)) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32
+                " - Error al escribir status en respuesta de COMMIT TAG",
+                query_id);
+      package_destroy(response);
+      return NULL;
+    }
+  }
+
   free(name);
   free(tag);
-
-  t_package *response = package_create_empty(STORAGE_OP_TAG_COMMIT_RES);
-  if (!response) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",
-              query_id);
-    return NULL;
-  }
-
-  if (!package_add_int8(response, (int8_t)operation_result)) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32
-              " - Error al escribir status en respuesta de COMMIT TAG",
-              query_id);
-    package_destroy(response);
-    return NULL;
-  }
 
   package_reset_read_offset(response);
 
@@ -86,7 +103,7 @@ end:
 int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
   int retval = 0;
 
-  lock_file(name, tag, false);
+  //lock_file(name, tag, false);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -112,6 +129,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
              "## Query ID: %" PRIu32 " - El archivo %s:%s ya está en estado "
              "'COMMITTED'.",
              query_id, name, tag);
+             retval = FILE_ALREADY_COMMITTED;
     goto cleanup_metadata;
   }
 
@@ -152,7 +170,7 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
 
   return retval;
 }
