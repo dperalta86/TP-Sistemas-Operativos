@@ -3,8 +3,8 @@
 #include "error_messages.h"
 #include <limits.h>
 
-int create_tag(uint32_t query_id, const char *name, const char *src_tag,
-               const char *dst_tag) {
+int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
+               const char *file_dst, const char *tag_dst) {
   int retval = 0;
 
   char tag_dst_dir[PATH_MAX]; 
@@ -22,7 +22,7 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
   if (metadata_dst) {
     log_error(g_storage_logger,
               "## %u - No se puede crear el tag %s:%s porque ya existe",
-              query_id, name, dst_tag);
+              query_id, file_dst, tag_dst);
     retval = FILE_TAG_ALREADY_EXISTS;
     goto end;
   }
@@ -116,23 +116,27 @@ t_package *handle_create_tag_op_package(t_package *package) {
     return NULL;
   }
 
-  char *name = package_read_string(package);
-  char *src_tag = package_read_string(package);
-  char *dst_tag = package_read_string(package);
+  char *file_src = package_read_string(package);
+  char *tag_src = package_read_string(package);
+  char *file_dst = package_read_string(package);
+  char *tag_dst = package_read_string(package);
 
-  if (!name || !src_tag || !dst_tag) {
+  if (!file_src || !tag_src || !file_dst || !tag_dst) {
     log_error(g_storage_logger,
               "## Error al deserializar parámetros de CREATE_TAG");
-    if (name)
-      free(name);
-    if (src_tag)
-      free(src_tag);
-    if (dst_tag)
-      free(dst_tag);
+    if (file_src)
+      free(file_src);
+    if (tag_src)
+      free(tag_src);
+    if (file_dst)
+      free(file_dst);
+    if (tag_dst)
+      free(tag_dst);
     return NULL;
   }
 
-  int operation_result = create_tag(query_id, name, src_tag, dst_tag);
+  int operation_result =
+      create_tag(query_id, file_src, tag_src, file_dst, tag_dst);
 
   free(file_src);
   free(tag_src);
