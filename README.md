@@ -109,11 +109,9 @@ El sistema está compuesto por cuatro módulos principales que interactúan medi
 ├── LICENSE
 ├── docs/
 │   ├── enunciado.pdf              # Enunciado completo del TP
-│   ├── arquitectura.md            # Documentación técnica detallada
-│   ├── implementacion.md          # Decisiones de diseño y algoritmos
-│   └── diagramas/
-│       └── arquitectura-general.png
-├── pruebas-catedra/               # Suite de pruebas provista por la cátedra
+│   ├── arquitectura.md            # Documentación técnica detallada (próximamente)
+│   ├── implementacion.md          # Decisiones de diseño y algoritmos (próximamente)
+│   └── pruebas.pdf                # Documentación de pruebas provista por la catedra
 └── src/
     ├── query-control/             # Código del módulo Query Control
     ├── master/                    # Código del módulo Master
@@ -169,14 +167,14 @@ Cada módulo cuenta con su propio archivo de configuración donde se especifican
 
 ## 📊 Pruebas
 
-El proyecto incluye las pruebas oficiales provistas por la cátedra en el directorio `pruebas-catedra/`. El sistema ha sido validado y **aprobó exitosamente todas las pruebas**, así como la defensa oral del trabajo práctico.
+El proyecto incluye las pruebas oficiales provistas por la cátedra en el directorio `pruebas-catedra/`. El sistema ha sido validado y **aprobó exitosamente todas las** [**pruebas**](docs/pruebas.pdf), así como la defensa oral del trabajo práctico.
 
 ## 📚 Documentación Adicional
 
 Para información técnica detallada sobre la implementación, fundamentos teóricos y decisiones de diseño, consultar:
 
-- [**Arquitectura Detallada**](docs/arquitectura.md): Descripción profunda de cada módulo y sus interacciones
-- [**Implementación**](docs/implementacion.md): Algoritmos, estructuras de datos y desafíos técnicos
+- [**Arquitectura Detallada**](docs/arquitectura.md) (próximamente): Descripción profunda de cada módulo y sus interacciones
+- [**Implementación**](docs/implementacion.md) (próximamente): Algoritmos, estructuras de datos y desafíos técnicos
 - [**Enunciado Original**](docs/enunciado.pdf): Especificación completa del trabajo práctico
 
 ## 👥 Equipo de Desarrollo
